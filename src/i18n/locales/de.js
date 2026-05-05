@@ -53,6 +53,7 @@
       exportJson: 'JSON exportieren',
       importJson: 'JSON importieren',
       undoStep: 'Schritt rückgängig',
+      redoStep: 'Schritt wiederholen',
       clearHistory: 'Verlauf löschen',
       previous: 'Zurück',
       next: 'Weiter',
@@ -99,8 +100,9 @@
       targetStrategy: 'Zielauswahlstrategie',
       undoHistory: 'Undo-Verlauf',
       limit: 'Limit',
-      undoDepth: 'Schritte im Verlauf: {{count}} / {{limit}}',
+      undoDepth: 'Schritte zurück / vor: {{undoCount}} / {{redoCount}} · Limit {{limit}}',
       undoActionCaption: 'Einen Schritt zurückgehen',
+      redoActionCaption: 'Einen Schritt vorwärtsgehen',
       clearHistoryCaption: 'Gesammelte Snapshots löschen'
     },
     widgets: {

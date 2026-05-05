@@ -203,6 +203,7 @@
     let activeRotateDelta = 0;
     let activeRotateDisplayDelta = 0;
     const undoHistory = [];
+    const redoHistory = [];
     let undoHistoryLimit = DEFAULT_UNDO_HISTORY_LIMIT;
 
     const tAxis = new THREE.Vector3();
@@ -880,12 +881,34 @@
       return JSON.stringify(snapshot);
     }
 
+    function pushHistoryEntry(historyStack, snapshot) {
+      const nextKey = createEditorSnapshotKey(snapshot);
+      const lastEntry = historyStack[historyStack.length - 1] || null;
+      if (!lastEntry || lastEntry.key !== nextKey) {
+        historyStack.push({ snapshot: snapshot, key: nextKey });
+        return true;
+      }
+      return false;
+    }
+
     function getUndoDepth() {
       return undoHistory.length;
     }
 
+    function getRedoDepth() {
+      return redoHistory.length;
+    }
+
     function canUndo() {
       return getUndoDepth() > 0;
+    }
+
+    function canRedo() {
+      return getRedoDepth() > 0;
+    }
+
+    function canClearHistory() {
+      return canUndo() || canRedo();
     }
 
     function trimUndoHistory() {
@@ -894,29 +917,48 @@
       }
     }
 
+    function trimRedoHistory() {
+      if (redoHistory.length > undoHistoryLimit) {
+        redoHistory.splice(0, redoHistory.length - undoHistoryLimit);
+      }
+    }
+
+    function clearRedoHistory(options) {
+      const config = Object.assign({ refresh: false }, options || {});
+      const hadEntries = redoHistory.length > 0;
+      redoHistory.length = 0;
+      if (config.refresh && hadEntries) {
+        refreshLayoutControls();
+      }
+    }
+
     function setUndoHistoryLimit(value) {
       const numericValue = Number(value);
       const nextLimit = Math.max(1, Math.min(MAX_UNDO_HISTORY_LIMIT, Math.round(Number.isFinite(numericValue) ? numericValue : undoHistoryLimit)));
       undoHistoryLimit = nextLimit;
       trimUndoHistory();
+      trimRedoHistory();
       refreshLayoutControls();
       return undoHistoryLimit;
     }
 
     function clearUndoHistory() {
       undoHistory.length = 0;
+      redoHistory.length = 0;
       refreshLayoutControls();
     }
 
     function rememberUndoSnapshot(snapshot) {
       const nextSnapshot = snapshot || createEditorSnapshot();
-      const nextKey = createEditorSnapshotKey(nextSnapshot);
-      const lastEntry = undoHistory[undoHistory.length - 1] || null;
-      if (!lastEntry || lastEntry.key !== nextKey) {
-        undoHistory.push({ snapshot: nextSnapshot, key: nextKey });
+      if (pushHistoryEntry(undoHistory, nextSnapshot)) {
         trimUndoHistory();
       }
       refreshLayoutControls();
+    }
+
+    function beginCommittedHistoryChange(snapshot) {
+      rememberUndoSnapshot(snapshot);
+      clearRedoHistory({ refresh: true });
     }
 
     function applyEditorSnapshot(snapshot) {
@@ -969,13 +1011,46 @@
         return false;
       }
 
+      const currentSnapshot = createEditorSnapshot();
       const entry = undoHistory.pop();
       const applied = applyEditorSnapshot(entry.snapshot);
       if (!applied) {
         undoHistory.push(entry);
+      } else if (pushHistoryEntry(redoHistory, currentSnapshot)) {
+        trimRedoHistory();
       }
       refreshLayoutControls();
       return applied;
+    }
+
+    function redoLastAction() {
+      if (!canRedo()) {
+        return false;
+      }
+
+      const currentSnapshot = createEditorSnapshot();
+      const entry = redoHistory.pop();
+      const applied = applyEditorSnapshot(entry.snapshot);
+      if (!applied) {
+        redoHistory.push(entry);
+      } else if (pushHistoryEntry(undoHistory, currentSnapshot)) {
+        trimUndoHistory();
+      }
+      refreshLayoutControls();
+      return applied;
+    }
+
+    function isHistoryNavigationBlocked() {
+      return !!(pendingPick || activeInteraction || isOrbiting || isPanning || isConnectMode() || mode === 'postConnectAdjust');
+    }
+
+    function isEditableEventTarget(target) {
+      return !!(target && target.nodeType === 1 && (
+        target.isContentEditable ||
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT'
+      ));
     }
 
     function refreshLayoutControls() {
@@ -1242,6 +1317,8 @@
       if (binding.undoInfoElement) {
         binding.undoInfoElement.textContent = t('settings.undoDepth', {
           count: getUndoDepth(),
+          undoCount: getUndoDepth(),
+          redoCount: getRedoDepth(),
           limit: undoHistoryLimit
         });
       }
@@ -1251,8 +1328,13 @@
         binding.undoButton.setAttribute('aria-disabled', binding.undoButton.disabled ? 'true' : 'false');
       }
 
+      if (binding.redoButton) {
+        binding.redoButton.disabled = !canRedo();
+        binding.redoButton.setAttribute('aria-disabled', binding.redoButton.disabled ? 'true' : 'false');
+      }
+
       if (binding.clearUndoButton) {
-        binding.clearUndoButton.disabled = !canUndo();
+        binding.clearUndoButton.disabled = !canClearHistory();
         binding.clearUndoButton.setAttribute('aria-disabled', binding.clearUndoButton.disabled ? 'true' : 'false');
       }
 
@@ -1708,7 +1790,7 @@
       const nextSnap = postConnectAdjustState.snapVariants[postConnectAdjustState.previewVariantIndex] || null;
       if (config.commit && nextSnap) {
         if (postConnectAdjustState.previewVariantIndex !== postConnectAdjustState.committedVariantIndex) {
-          rememberUndoSnapshot();
+          beginCommittedHistoryChange();
         }
         applyComponentTransform(postConnectAdjustState.snapshot, nextSnap.snapPos, nextSnap.snapQuat);
         postConnectAdjustState.committedVariantIndex = postConnectAdjustState.previewVariantIndex;
@@ -1929,7 +2011,7 @@
         return false;
       }
 
-      rememberUndoSnapshot();
+      beginCommittedHistoryChange();
 
       const rootPartId = connectState.rootPartId;
       const connectSnapshot = connectState.snapshot;
@@ -2699,7 +2781,7 @@
         return;
       }
 
-      rememberUndoSnapshot();
+      beginCommittedHistoryChange();
 
       const joint = getSelectedJoint();
       if (joint && (joint.a.partId === part.id || joint.b.partId === part.id)) {
@@ -2716,7 +2798,7 @@
         return;
       }
 
-      rememberUndoSnapshot();
+      beginCommittedHistoryChange();
       clearTransientSelectionHighlights();
       assembly.disconnectJoint(joint.id);
       selectedJointId = null;
@@ -2749,7 +2831,7 @@
     }
 
     function addProfile() {
-      rememberUndoSnapshot();
+      beginCommittedHistoryChange();
       const length = clampProfileLength(profileLengthValue);
       const part = assembly.createPart('profile-20x20', { length }, {
         position: [viewport.orb.tx, PROFILE_SIZE / 2, viewport.orb.tz],
@@ -2761,7 +2843,7 @@
     }
 
     function addConnector(typeId) {
-      rememberUndoSnapshot();
+      beginCommittedHistoryChange();
       const part = assembly.createPart(typeId, {}, {
         position: [viewport.orb.tx, PROFILE_SIZE / 2, viewport.orb.tz],
         quaternion: [0, 0, 0, 1]
@@ -2776,7 +2858,7 @@
       if (!part) {
         return;
       }
-      rememberUndoSnapshot();
+      beginCommittedHistoryChange();
       removePartView(part.id);
       assembly.removePart(part.id);
       selectedPartId = null;
@@ -2986,12 +3068,18 @@
         caption: t('settings.undoActionCaption'),
         onClick: undoLastAction
       });
+      const redoButton = createCanvasActionButton({
+        label: t('actions.redoStep'),
+        caption: t('settings.redoActionCaption'),
+        onClick: redoLastAction
+      });
       const clearUndoButton = createCanvasActionButton({
         label: t('actions.clearHistory'),
         caption: t('settings.clearHistoryCaption'),
         onClick: clearUndoHistory
       });
       undoActions.appendChild(undoButton);
+      undoActions.appendChild(redoButton);
       undoActions.appendChild(clearUndoButton);
       container.appendChild(undoActions);
 
@@ -3000,6 +3088,7 @@
         alignStateElement: alignState,
         undoInfoElement: undoInfo,
         undoButton: undoButton,
+        redoButton: redoButton,
         clearUndoButton: clearUndoButton,
         undoLimitInput: undoLimitInput
       }));
@@ -3364,7 +3453,7 @@
       const reader = new FileReader();
       reader.onload = function(event) {
         const data = JSON.parse(event.target.result);
-        rememberUndoSnapshot(previousState);
+        beginCommittedHistoryChange(previousState);
         applyEditorSnapshot(data);
       };
       reader.readAsText(file);
@@ -3454,10 +3543,20 @@
             icon: '↶',
             label: t('actions.undoStep'),
             getDisabled: function() {
-              return !canUndo() || pendingPick || activeInteraction || isOrbiting || isPanning || isConnectMode() || mode === 'postConnectAdjust';
+              return !canUndo() || isHistoryNavigationBlocked();
             },
             onClick: function() {
               undoLastAction();
+            }
+          },
+          {
+            icon: '↷',
+            label: t('actions.redoStep'),
+            getDisabled: function() {
+              return !canRedo() || isHistoryNavigationBlocked();
+            },
+            onClick: function() {
+              redoLastAction();
             }
           }
         ],
@@ -3971,6 +4070,10 @@
         }
       }
 
+      if ((mode === 'dragPart' || mode === 'translate' || mode === 'rotate' || mode === 'length') && interactionEdited) {
+        clearRedoHistory({ refresh: true });
+      }
+
       if (mode === 'dragPart' && activeInteraction) {
         if (interactionEdited && activeSnap) {
           applyComponentTransform(activeInteraction, activeSnap.snapPos, activeSnap.snapQuat);
@@ -4047,6 +4150,23 @@
     }, { passive: false });
 
     window.addEventListener('keydown', function(event) {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && !isEditableEventTarget(event.target) && !isHistoryNavigationBlocked()) {
+        const key = String(event.key || '').toLowerCase();
+        if (!event.shiftKey && key === 'z') {
+          if (undoLastAction()) {
+            event.preventDefault();
+          }
+          return;
+        }
+
+        if (key === 'y' || (event.shiftKey && key === 'z')) {
+          if (redoLastAction()) {
+            event.preventDefault();
+          }
+          return;
+        }
+      }
+
       if (mode === 'postConnectAdjust' && !event.altKey && !event.ctrlKey && !event.metaKey) {
         if (event.key === 'ArrowLeft') {
           if (cyclePostConnectAdjustVariant(-1)) {

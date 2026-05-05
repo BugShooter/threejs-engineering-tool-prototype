@@ -53,6 +53,7 @@
       exportJson: 'Экспорт JSON',
       importJson: 'Импорт JSON',
       undoStep: 'Отменить шаг',
+      redoStep: 'Повторить шаг',
       clearHistory: 'Очистить историю',
       previous: 'Пред.',
       next: 'След.',
@@ -99,8 +100,9 @@
       targetStrategy: 'Стратегия выбора цели',
       undoHistory: 'История отмены',
       limit: 'Лимит',
-      undoDepth: 'Шагов в истории: {{count}} / {{limit}}',
+      undoDepth: 'Шагов назад / вперёд: {{undoCount}} / {{redoCount}} · лимит {{limit}}',
       undoActionCaption: 'Вернуться на один шаг назад',
+      redoActionCaption: 'Вернуться на один шаг вперёд',
       clearHistoryCaption: 'Сбросить накопленные снимки состояния'
     },
     widgets: {

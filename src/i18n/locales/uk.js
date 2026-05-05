@@ -53,6 +53,7 @@
       exportJson: 'Експорт JSON',
       importJson: 'Імпорт JSON',
       undoStep: 'Скасувати крок',
+      redoStep: 'Повторити крок',
       clearHistory: 'Очистити історію',
       previous: 'Попер.',
       next: 'Наст.',
@@ -99,8 +100,9 @@
       targetStrategy: 'Стратегія вибору цілі',
       undoHistory: 'Історія скасувань',
       limit: 'Ліміт',
-      undoDepth: 'Кроків в історії: {{count}} / {{limit}}',
+      undoDepth: 'Кроків назад / вперед: {{undoCount}} / {{redoCount}} · ліміт {{limit}}',
       undoActionCaption: 'Повернутися на один крок назад',
+      redoActionCaption: 'Перейти на один крок вперед',
       clearHistoryCaption: 'Очистити накопичені знімки стану'
     },
     widgets: {

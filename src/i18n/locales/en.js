@@ -53,6 +53,7 @@
       exportJson: 'Export JSON',
       importJson: 'Import JSON',
       undoStep: 'Undo step',
+      redoStep: 'Redo step',
       clearHistory: 'Clear history',
       previous: 'Previous',
       next: 'Next',
@@ -99,8 +100,9 @@
       targetStrategy: 'Target selection strategy',
       undoHistory: 'Undo history',
       limit: 'Limit',
-      undoDepth: 'History steps: {{count}} / {{limit}}',
+      undoDepth: 'Undo / Redo steps: {{undoCount}} / {{redoCount}} · limit {{limit}}',
       undoActionCaption: 'Return one step back',
+      redoActionCaption: 'Move one step forward',
       clearHistoryCaption: 'Clear accumulated snapshots'
     },
     widgets: {
