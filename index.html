@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>3D Конструктор v4</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0a0c10;color:#c8cdd8;font-family:'JetBrains Mono',monospace;display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+#app-topbar{flex:0 0 56px;display:flex;align-items:center;justify-content:space-between;padding:0 18px 0 20px;border-bottom:1px solid #1e2230;background:linear-gradient(180deg,rgba(17,19,26,.98),rgba(11,14,20,.94));box-shadow:0 10px 24px rgba(0,0,0,.18);z-index:12;}
+.app-topbar-brand{display:flex;align-items:center;gap:10px;min-width:0;}
+.app-topbar-mark{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border:1px solid #2f4470;border-radius:7px;background:rgba(18,28,48,.82);color:#8fb1ff;font-size:13px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05);}
+.app-topbar-copy{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.app-topbar-title{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#dbe6ff;white-space:nowrap;}
+.app-topbar-subtitle{font-size:7px;letter-spacing:.08em;text-transform:uppercase;color:#6f82ad;white-space:nowrap;}
+#app-topbar-guest{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid #2e4468;border-radius:999px;background:rgba(20,27,40,.92);color:#dce6ff;font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.08em;text-transform:uppercase;cursor:default;box-shadow:0 8px 20px rgba(0,0,0,.16);}
+.app-topbar-guest-dot{width:8px;height:8px;border-radius:999px;background:#7ee2a8;box-shadow:0 0 0 3px rgba(126,226,168,.12);}
+.app-topbar-guest-label{color:#eef4ff;}
+.app-topbar-guest-menu{color:#8da1cc;font-size:10px;line-height:1;}
+#legacy-ui{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0;}
+h1{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#5a8fff;padding-bottom:8px;border-bottom:1px solid #1e2230;}
+.sec{display:flex;flex-direction:column;gap:5px;}
+.st{font-size:7px;letter-spacing:.14em;text-transform:uppercase;color:#3a4060;margin-bottom:1px;}
+.row{display:flex;align-items:center;gap:5px;}
+.lbl{font-size:8px;color:#6070a0;white-space:nowrap;min-width:38px;}
+input[type=number]{width:54px;background:#181b24;border:1px solid #252a38;color:#c8cdd8;font-family:'JetBrains Mono',monospace;font-size:9px;padding:3px 4px;border-radius:3px;outline:none;}
+input[type=number]:focus{border-color:#5a8fff;}
+select{width:100%;background:#181b24;border:1px solid #252a38;color:#c8cdd8;font-family:'JetBrains Mono',monospace;font-size:8px;padding:5px 6px;border-radius:3px;outline:none;}
+select:focus{border-color:#5a8fff;}
+.divider{height:1px;background:#1e2230;flex-shrink:0;}
+.btn{width:100%;padding:6px 8px;border:1px solid #252a38;border-radius:3px;background:#181b24;color:#c8cdd8;font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.05em;cursor:pointer;text-align:left;transition:all .1s;display:flex;align-items:center;gap:6px;}
+.btn:hover{background:#1e2230;border-color:#5a8fff;color:#fff;}
+.btn:active{background:#252a38;}
+.bp{border-left:3px solid #4a7fff;}.ba{border-left:3px solid #ff8c42;}.bs{border-left:3px solid #ff42aa;}.bd{border-left:3px solid #ff3355;}.br{border-left:3px solid #22ffaa;}
+#sel-info{font-size:8px;color:#6070a0;line-height:1.7;min-height:16px;}
+#sel-info .hi{color:#5a8fff;}
+#sel-panel{display:none;flex-direction:column;gap:5px;}
+#hint{margin-top:auto;background:#181b24;border:1px solid #1e2230;border-radius:3px;padding:7px 8px;font-size:7px;color:#3a4060;line-height:1.85;flex-shrink:0;}
+#hint b{color:#4a6090;}
+#canvas-wrap{flex:1;min-height:0;position:relative;}
+canvas{display:block;}
+#snap-badge{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(32,255,136,.1);border:1px solid #20ff88;color:#20ff88;font-size:7px;letter-spacing:.12em;padding:3px 12px;border-radius:16px;pointer-events:none;opacity:0;transition:opacity .15s;font-family:'JetBrains Mono',monospace;}
+#snap-badge.on{opacity:1;}
+#drag-hud{position:absolute;top:10px;left:12px;min-width:156px;max-width:220px;background:rgba(10,12,16,.92);border:1px solid #25304a;border-radius:8px;padding:8px 10px;box-shadow:0 10px 26px rgba(0,0,0,.22);pointer-events:none;font-size:8px;line-height:1.55;color:#8ea0c8;display:none;z-index:18;backdrop-filter:blur(8px);}
+#drag-hud.visible{display:block;}
+#drag-hud .ttl{font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:#cfe0ff;margin-bottom:4px;}
+#drag-hud .kv{color:#6f82ad;}
+#drag-hud .v{color:#d7e2ff;}
+#mode-lbl{position:absolute;top:10px;right:12px;font-size:7px;color:#2a3a50;font-family:'JetBrains Mono',monospace;}
+.view-cube{position:absolute;top:30px;right:12px;width:112px;height:112px;border:1px solid #28344f;border-radius:12px;background:rgba(11,14,20,.76);box-shadow:0 12px 28px rgba(0,0,0,.24);backdrop-filter:blur(8px);overflow:hidden;z-index:17;}
+.view-cube canvas{display:block;width:100%;height:100%;}
+.scene-overlay{position:absolute;inset:0;pointer-events:none;z-index:20;overflow:hidden;}
+.scene-overlay svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;}
+.scene-overlay.suppressed .callout,.scene-overlay.suppressed .callout-tooltip,.scene-overlay.suppressed svg{display:none;}
+.callout{position:absolute;min-width:148px;max-width:220px;background:rgba(17,19,26,.96);border:1px solid #2b3245;border-radius:8px;padding:8px 9px;box-shadow:0 12px 30px rgba(0,0,0,.28);pointer-events:auto;backdrop-filter:blur(8px);}
+.callout.hidden{display:none;}
+.callout-helper{min-width:280px;max-width:320px;}
+.callout-title{font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:#9cb4ff;margin-bottom:5px;}
+.callout-lines{display:flex;flex-direction:column;gap:3px;font-size:8px;line-height:1.45;color:#7e8ab0;}
+.callout-actions{display:flex;align-items:center;gap:5px;margin-top:8px;flex-wrap:wrap;}
+.callout-btn{width:24px;height:24px;border:1px solid #2b3245;border-radius:6px;background:#151923;color:#d6deff;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s;pointer-events:auto;gap:0;}
+.callout-btn:not(.is-disabled):hover{border-color:#5a8fff;background:#1b2231;color:#fff;transform:translateY(-1px);}
+.callout-btn.wide{width:auto;min-width:92px;padding:0 10px;justify-content:flex-start;gap:6px;font-size:9px;}
+.callout-btn-icon,.callout-btn-label{display:inline-flex;align-items:center;line-height:1;}
+.callout-btn.active{border-color:#22ff88;color:#22ff88;background:rgba(34,255,136,.08);}
+.callout-btn.danger:not(.is-disabled):hover{border-color:#ff6677;color:#ff6677;}
+.callout-btn.is-disabled,.callout-btn[disabled]{opacity:.35;cursor:not-allowed;transform:none;}
+.callout-tooltip{position:absolute;padding:5px 7px;border-radius:6px;background:rgba(8,10,14,.96);border:1px solid #2b3245;color:#d6deff;font-size:7px;letter-spacing:.05em;pointer-events:none;transform:translate(-50%,-100%);white-space:nowrap;z-index:3;box-shadow:0 8px 20px rgba(0,0,0,.25);}
+.callout-tooltip.hidden{display:none;}
+.debug-options{display:grid;grid-template-columns:minmax(0,1fr);gap:4px;width:100%;min-width:0;box-sizing:border-box;padding:5px 6px;border:1px solid #252a38;border-radius:4px;background:#151923;transition:opacity .12s;}
+.debug-options.is-muted{opacity:.45;}
+.debug-check{display:flex;align-items:flex-start;gap:6px;min-width:0;font-size:7px;line-height:1.35;color:#91a2cb;cursor:pointer;user-select:none;}
+.debug-check input{flex:0 0 auto;margin-top:1px;}
+.debug-check input{accent-color:#66c2ff;}
+.debug-number-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;min-width:0;font-size:7px;color:#91a2cb;}
+.debug-number-row span{flex:1 1 auto;min-width:0;line-height:1.2;white-space:normal;overflow-wrap:anywhere;}
+.debug-number-row input[type=number]{flex:0 0 62px;width:62px;min-width:62px;padding:2px 4px;font-size:8px;box-sizing:border-box;}
+.connect-debug-labels{position:absolute;inset:0;pointer-events:none;}
+.connect-debug-label{position:absolute;transform:translate(0,-100%);padding:3px 5px;background:rgba(11,14,20,.92);border:1px solid #25304a;border-radius:4px;font-size:7px;line-height:1.35;color:#d7e2ff;white-space:nowrap;box-shadow:0 8px 18px rgba(0,0,0,.22);}
+</style>
+</head>
+<body>
+<div id="app-topbar">
+  <div class="app-topbar-brand">
+    <span class="app-topbar-mark">⬡</span>
+    <div class="app-topbar-copy">
+      <div class="app-topbar-title">3D Конструктор</div>
+      <div class="app-topbar-subtitle">Рабочая область</div>
+    </div>
+  </div>
+  <button id="app-topbar-guest" type="button" aria-label="Профиль пользователя Guest">
+    <span class="app-topbar-guest-dot"></span>
+    <span class="app-topbar-guest-label">Guest</span>
+    <span class="app-topbar-guest-menu">▾</span>
+  </button>
+</div>
+<div id="legacy-ui" aria-hidden="true">
+  <h1>⬡ Constructor 3D</h1>
+  <div class="sec">
+    <div class="st">Добавить</div>
+    <div class="row"><span class="lbl">Длина</span><input type="number" id="plen" value="200" min="40" max="800" step="10"><span class="lbl">мм</span></div>
+    <button class="btn bp" id="btn-add-profile">▬ Профиль</button>
+    <button class="btn ba" id="btn-add-angle">⌐ Соед. угловой</button>
+    <button class="btn bs" id="btn-add-straight">— Соед. прямой</button>
+  </div>
+  <div class="divider"></div>
+  <div class="sec">
+    <div class="st">Выбрано</div>
+    <div id="sel-info">—</div>
+    <div id="sel-panel">
+      <button class="btn" id="btn-connect-selected" style="border-left:3px solid #5ca8ff;">⊕ Соединить</button>
+      <button class="btn" id="btn-disconnect-selected" style="border-left:3px solid #ffaa44;">⇄ Отсоединить деталь</button>
+      <button class="btn bd" id="btn-delete-selected">✕ Удалить</button>
+    </div>
+  </div>
+  <div class="divider"></div>
+  <div class="sec">
+    <div class="st">Связь</div>
+    <div id="joint-info">—</div>
+    <div id="joint-panel" style="display:none;flex-direction:column;gap:5px;">
+      <button class="btn" id="btn-split-joint" style="border-left:3px solid #ff6677;">⟂ Разорвать связь</button>
+    </div>
+  </div>
+  <div class="divider"></div>
+  <div class="sec">
+    <div class="st">Стратегия</div>
+    <select id="connect-strategy-select"></select>
+  </div>
+  <div class="divider"></div>
+  <div class="sec">
+    <div class="st">Привязка</div>
+    <button class="btn" id="btn-align" style="border-left:3px solid #aa88ff;">
+      <span id="align-icon">⊞</span> Выравнивание: <span id="align-state" style="color:#22ff88">ВКЛ</span>
+    </button>
+  </div>
+  <div class="divider"></div>
+  <div class="sec">
+    <button class="btn br" id="btn-reset-camera">⌂ Сбросить вид</button>
+  </div>
+  <div class="divider"></div>
+  <div class="sec">
+    <div class="st">Отладка</div>
+    <button class="btn" id="btn-toggle-connect-debug" style="border-left:3px solid #66c2ff;">
+      ◌ Портовый debug: <span id="connect-debug-state" style="color:#6070a0">ВЫКЛ</span>
+    </button>
+    <div id="connect-debug-options" class="debug-options is-muted">
+      <label class="debug-check"><input type="checkbox" id="debug-show-ray" checked> Луч</label>
+      <label class="debug-check"><input type="checkbox" id="debug-show-hit-point" checked> Hit point</label>
+      <label class="debug-check"><input type="checkbox" id="debug-show-port-normal" checked> Нормаль</label>
+      <label class="debug-check"><input type="checkbox" id="debug-show-exact-plane" checked> Exact plane</label>
+      <label class="debug-check"><input type="checkbox" id="debug-show-lifted-overlay" checked> Lifted overlay</label>
+      <label class="debug-check"><input type="checkbox" id="debug-show-contact-footprint" checked> Footprint</label>
+      <label class="debug-check"><input type="checkbox" id="debug-show-shortlist"> Hover shortlist</label>
+    </div>
+    <div id="connect-debug-strategy-controls"></div>
+  </div>
+  <div class="divider"></div>
+  <div class="sec">
+    <div class="st">Файл</div>
+    <button class="btn" id="btn-export-json">⇩ Экспорт JSON</button>
+    <button class="btn" id="btn-import-json">⇧ Импорт JSON</button>
+    <input type="file" id="input-import-json" accept="application/json" style="display:none;">
+  </div>
+  <div id="hint">
+    <b>Гизмо:</b><br>
+    Цветные оси → перемещение<br>
+    Кольца → вращение<br>
+    Белые стрелки → длина профиля<br><br>
+    <b>Клик по детали / связи</b> → выноска<br>
+    <b>Потянуть деталь</b> → drag без выноски<br>
+    <b>Соединить</b> → выбрать порт, затем цель<br>
+    <b>Esc</b> → снять выделение / отменить действие<br><br>
+    <b>ЛКМ</b> пусто → орбита<br>
+    <b>ПКМ</b> → панорама<br>
+    <b>Колесо</b> → зум
+  </div>
+</div>
+<div id="canvas-wrap">
+  <canvas id="c"></canvas>
+  <div id="snap-badge">⊕ SNAP</div>
+  <div id="drag-hud"></div>
+  <div id="mode-lbl">—</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="./src/app/bootstrap.js"></script>
+<script src="./src/catalog/defaultCatalog.js"></script>
+<script src="./src/domain/PartCatalog.js"></script>
+<script src="./src/domain/Assembly.js"></script>
+<script src="./src/domain/ports.js"></script>
+<script src="./src/domain/Serialization.js"></script>
+<script src="./src/math/geometry.js"></script>
+<script src="./src/engine/SnapSolver.js"></script>
+<script src="./src/connect/TargetSelectionContextBuilder.js"></script>
+<script src="./src/connect/TargetSelectionStrategyRegistry.js"></script>
+<script src="./src/connect/ui/ConnectStrategyPanel.js"></script>
+<script src="./src/connect/strategies/VisibleHiddenTargetStrategy.js"></script>
+<script src="./src/scene/MeshFactory.js"></script>
+<script src="./src/scene/ThreeViewport.js"></script>
+<script src="./src/editor/OverlayManager.js"></script>
+<script src="./src/editor/OverlayLayer.js"></script>
+<script src="./src/editor/ViewCube.js"></script>
+<script src="./src/editor/widgets/DomWidget.js"></script>
+<script src="./src/editor/widgets/ViewCubeWidget.js"></script>
+<script src="./src/editor/PreviewLayer.js"></script>
+<script src="./src/editor/CanvasLayoutPrototype.js"></script>
+<script src="./src/connect/debug/CommonConnectDebugController.js"></script>
+<script src="./src/connect/debug/common/CommonConnectDebug3D.js"></script>
+<script src="./src/connect/debug/common/CommonConnectDebug2D.js"></script>
+<script src="./src/connect/debug/strategies/VisibleHiddenDebugPanel.js"></script>
+<script src="./src/connect/debug/strategies/VisibleHiddenDebug3D.js"></script>
+<script src="./src/connect/debug/strategies/VisibleHiddenDebug2D.js"></script>
+<script src="./src/connect/debug/strategies/VisibleHiddenDebugAdapter.js"></script>
+<script src="./src/connect/strategies/VisibleHiddenStrategy.js"></script>
+<script src="./src/connect/strategies/BuiltInTargetSelectionStrategies.js"></script>
+<script src="./src/editor/GizmoManager.js"></script>
+<script src="./src/app/createApp.js"></script>
+<script src="./src/main.js"></script>
+</body>
+</html>
