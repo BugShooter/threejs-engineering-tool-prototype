@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>3D Конструктор v4</title>
+<title>3D Engineering Tool v4</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -13,10 +13,15 @@ body{background:#0a0c10;color:#c8cdd8;font-family:'JetBrains Mono',monospace;dis
 .app-topbar-copy{display:flex;flex-direction:column;gap:2px;min-width:0;}
 .app-topbar-title{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#dbe6ff;white-space:nowrap;}
 .app-topbar-subtitle{font-size:7px;letter-spacing:.08em;text-transform:uppercase;color:#6f82ad;white-space:nowrap;}
-#app-topbar-guest{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid #2e4468;border-radius:999px;background:rgba(20,27,40,.92);color:#dce6ff;font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.08em;text-transform:uppercase;cursor:default;box-shadow:0 8px 20px rgba(0,0,0,.16);}
-.app-topbar-guest-dot{width:8px;height:8px;border-radius:999px;background:#7ee2a8;box-shadow:0 0 0 3px rgba(126,226,168,.12);}
-.app-topbar-guest-label{color:#eef4ff;}
-.app-topbar-guest-menu{color:#8da1cc;font-size:10px;line-height:1;}
+.app-topbar-actions{display:flex;align-items:center;gap:10px;flex:0 0 auto;min-width:0;}
+.app-topbar-language{display:flex;align-items:center;gap:0;padding:7px 10px 7px 12px;border:1px solid #2e4468;border-radius:8px;background:rgba(20,27,40,.92);color:#dce6ff;font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.08em;text-transform:uppercase;box-shadow:0 8px 20px rgba(0,0,0,.16);}
+.app-topbar-language-select{width:auto;background:transparent;border:none;color:#eef4ff;font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.08em;text-transform:uppercase;outline:none;cursor:pointer;min-width:110px;}
+.app-topbar-language-select option{background:#151923;color:#eef4ff;}
+.app-topbar-profile{display:flex;align-items:center;gap:10px;padding:7px 12px;border:1px solid #2a3955;border-radius:8px;background:rgba(18,24,35,.94);box-shadow:0 8px 20px rgba(0,0,0,.16);min-width:0;}
+.app-topbar-profile-avatar{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:1px solid #3b5685;border-radius:50%;background:radial-gradient(circle at 30% 30%,rgba(137,183,255,.22),rgba(36,48,72,.96));color:#eef4ff;font-size:10px;letter-spacing:.08em;flex:0 0 auto;}
+.app-topbar-profile-copy{display:flex;flex-direction:column;gap:1px;min-width:0;}
+.app-topbar-profile-name{font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:#eef4ff;white-space:nowrap;}
+.app-topbar-profile-meta{font-size:7px;letter-spacing:.06em;text-transform:uppercase;color:#7f94bf;white-space:nowrap;}
 #legacy-ui{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0;}
 h1{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#5a8fff;padding-bottom:8px;border-bottom:1px solid #1e2230;}
 .sec{display:flex;flex-direction:column;gap:5px;}
@@ -77,6 +82,7 @@ canvas{display:block;}
 .debug-number-row input[type=number]{flex:0 0 62px;width:62px;min-width:62px;padding:2px 4px;font-size:8px;box-sizing:border-box;}
 .connect-debug-labels{position:absolute;inset:0;pointer-events:none;}
 .connect-debug-label{position:absolute;transform:translate(0,-100%);padding:3px 5px;background:rgba(11,14,20,.92);border:1px solid #25304a;border-radius:4px;font-size:7px;line-height:1.35;color:#d7e2ff;white-space:nowrap;box-shadow:0 8px 18px rgba(0,0,0,.22);}
+@media (max-width: 820px){#app-topbar{padding:0 12px;gap:8px;}.app-topbar-actions{gap:6px;}.app-topbar-language{padding:7px 10px;}.app-topbar-profile-meta{display:none;}.app-topbar-language-select{min-width:92px;}.app-topbar-profile{padding:6px 9px;}.app-topbar-profile-name{font-size:7px;}}
 </style>
 </head>
 <body>
@@ -84,28 +90,35 @@ canvas{display:block;}
   <div class="app-topbar-brand">
     <span class="app-topbar-mark">⬡</span>
     <div class="app-topbar-copy">
-      <div class="app-topbar-title">3D Конструктор</div>
-      <div class="app-topbar-subtitle">Рабочая область</div>
+      <div id="app-topbar-title" class="app-topbar-title">3D Engineering Tool</div>
+      <div id="app-topbar-subtitle" class="app-topbar-subtitle">Workspace</div>
     </div>
   </div>
-  <button id="app-topbar-guest" type="button" aria-label="Профиль пользователя Guest">
-    <span class="app-topbar-guest-dot"></span>
-    <span class="app-topbar-guest-label">Guest</span>
-    <span class="app-topbar-guest-menu">▾</span>
-  </button>
+  <div class="app-topbar-actions">
+    <div class="app-topbar-language">
+      <select id="app-topbar-language-select" class="app-topbar-language-select" aria-label="Language"></select>
+    </div>
+    <div class="app-topbar-profile" aria-hidden="true">
+      <span class="app-topbar-profile-avatar">◎</span>
+      <div class="app-topbar-profile-copy">
+        <div id="app-topbar-profile-name" class="app-topbar-profile-name">Guest User</div>
+        <div id="app-topbar-profile-meta" class="app-topbar-profile-meta">Profile Placeholder</div>
+      </div>
+    </div>
+  </div>
 </div>
 <div id="legacy-ui" aria-hidden="true">
-  <h1>⬡ Constructor 3D</h1>
+  <h1 id="legacy-heading">⬡ Constructor 3D</h1>
   <div class="sec">
-    <div class="st">Добавить</div>
-    <div class="row"><span class="lbl">Длина</span><input type="number" id="plen" value="200" min="40" max="800" step="10"><span class="lbl">мм</span></div>
+    <div class="st" id="legacy-section-add">Add</div>
+    <div class="row"><span class="lbl" id="legacy-length-label">Length</span><input type="number" id="plen" value="200" min="40" max="800" step="10"><span class="lbl" id="legacy-length-unit">mm</span></div>
     <button class="btn bp" id="btn-add-profile">▬ Профиль</button>
     <button class="btn ba" id="btn-add-angle">⌐ Соед. угловой</button>
     <button class="btn bs" id="btn-add-straight">— Соед. прямой</button>
   </div>
   <div class="divider"></div>
   <div class="sec">
-    <div class="st">Выбрано</div>
+    <div class="st" id="legacy-section-selected">Selected</div>
     <div id="sel-info">—</div>
     <div id="sel-panel">
       <button class="btn" id="btn-connect-selected" style="border-left:3px solid #5ca8ff;">⊕ Соединить</button>
@@ -115,7 +128,7 @@ canvas{display:block;}
   </div>
   <div class="divider"></div>
   <div class="sec">
-    <div class="st">Связь</div>
+    <div class="st" id="legacy-section-joint">Connection</div>
     <div id="joint-info">—</div>
     <div id="joint-panel" style="display:none;flex-direction:column;gap:5px;">
       <button class="btn" id="btn-split-joint" style="border-left:3px solid #ff6677;">⟂ Разорвать связь</button>
@@ -123,14 +136,14 @@ canvas{display:block;}
   </div>
   <div class="divider"></div>
   <div class="sec">
-    <div class="st">Стратегия</div>
+    <div class="st" id="legacy-section-strategy">Strategy</div>
     <select id="connect-strategy-select"></select>
   </div>
   <div class="divider"></div>
   <div class="sec">
-    <div class="st">Привязка</div>
+    <div class="st" id="legacy-section-alignment">Snap</div>
     <button class="btn" id="btn-align" style="border-left:3px solid #aa88ff;">
-      <span id="align-icon">⊞</span> Выравнивание: <span id="align-state" style="color:#22ff88">ВКЛ</span>
+      <span id="align-icon">⊞</span> <span id="align-label-text">Alignment</span>: <span id="align-state" style="color:#22ff88">ON</span>
     </button>
   </div>
   <div class="divider"></div>
@@ -139,40 +152,40 @@ canvas{display:block;}
   </div>
   <div class="divider"></div>
   <div class="sec">
-    <div class="st">Отладка</div>
+    <div class="st" id="legacy-section-debug">Debug</div>
     <button class="btn" id="btn-toggle-connect-debug" style="border-left:3px solid #66c2ff;">
-      ◌ Портовый debug: <span id="connect-debug-state" style="color:#6070a0">ВЫКЛ</span>
+      ◌ <span id="connect-debug-label-text">Port debug</span>: <span id="connect-debug-state" style="color:#6070a0">OFF</span>
     </button>
     <div id="connect-debug-options" class="debug-options is-muted">
-      <label class="debug-check"><input type="checkbox" id="debug-show-ray" checked> Луч</label>
-      <label class="debug-check"><input type="checkbox" id="debug-show-hit-point" checked> Hit point</label>
-      <label class="debug-check"><input type="checkbox" id="debug-show-port-normal" checked> Нормаль</label>
-      <label class="debug-check"><input type="checkbox" id="debug-show-exact-plane" checked> Exact plane</label>
-      <label class="debug-check"><input type="checkbox" id="debug-show-lifted-overlay" checked> Lifted overlay</label>
-      <label class="debug-check"><input type="checkbox" id="debug-show-contact-footprint" checked> Footprint</label>
-      <label class="debug-check"><input type="checkbox" id="debug-show-shortlist"> Hover shortlist</label>
+      <label class="debug-check"><input type="checkbox" id="debug-show-ray" checked> <span id="debug-show-ray-label">Ray</span></label>
+      <label class="debug-check"><input type="checkbox" id="debug-show-hit-point" checked> <span id="debug-show-hit-point-label">Hit point</span></label>
+      <label class="debug-check"><input type="checkbox" id="debug-show-port-normal" checked> <span id="debug-show-port-normal-label">Port normal</span></label>
+      <label class="debug-check"><input type="checkbox" id="debug-show-exact-plane" checked> <span id="debug-show-exact-plane-label">Exact plane</span></label>
+      <label class="debug-check"><input type="checkbox" id="debug-show-lifted-overlay" checked> <span id="debug-show-lifted-overlay-label">Lifted overlay</span></label>
+      <label class="debug-check"><input type="checkbox" id="debug-show-contact-footprint" checked> <span id="debug-show-contact-footprint-label">Footprint</span></label>
+      <label class="debug-check"><input type="checkbox" id="debug-show-shortlist"> <span id="debug-show-shortlist-label">Hover shortlist</span></label>
     </div>
     <div id="connect-debug-strategy-controls"></div>
   </div>
   <div class="divider"></div>
   <div class="sec">
-    <div class="st">Файл</div>
+    <div class="st" id="legacy-section-file">File</div>
     <button class="btn" id="btn-export-json">⇩ Экспорт JSON</button>
     <button class="btn" id="btn-import-json">⇧ Импорт JSON</button>
     <input type="file" id="input-import-json" accept="application/json" style="display:none;">
   </div>
   <div id="hint">
-    <b>Гизмо:</b><br>
-    Цветные оси → перемещение<br>
-    Кольца → вращение<br>
-    Белые стрелки → длина профиля<br><br>
-    <b>Клик по детали / связи</b> → выноска<br>
-    <b>Потянуть деталь</b> → drag без выноски<br>
-    <b>Соединить</b> → выбрать порт, затем цель<br>
-    <b>Esc</b> → снять выделение / отменить действие<br><br>
-    <b>ЛКМ</b> пусто → орбита<br>
-    <b>ПКМ</b> → панорама<br>
-    <b>Колесо</b> → зум
+    <b>Gizmo:</b><br>
+    Colored axes → move<br>
+    Rings → rotate<br>
+    White arrows → profile length<br><br>
+    <b>Click a part / joint</b> → callout<br>
+    <b>Drag a part</b> → drag without callout<br>
+    <b>Connect</b> → choose a source port, then a target<br>
+    <b>Esc</b> → clear selection / cancel action<br><br>
+    <b>LMB</b> empty space → orbit<br>
+    <b>RMB</b> → pan<br>
+    <b>Wheel</b> → zoom
   </div>
 </div>
 <div id="canvas-wrap">
@@ -184,6 +197,11 @@ canvas{display:block;}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="./src/app/bootstrap.js"></script>
+<script src="./src/i18n/createI18n.js"></script>
+<script src="./src/i18n/locales/en.js"></script>
+<script src="./src/i18n/locales/de.js"></script>
+<script src="./src/i18n/locales/uk.js"></script>
+<script src="./src/i18n/locales/ru.js"></script>
 <script src="./src/catalog/defaultCatalog.js"></script>
 <script src="./src/domain/PartCatalog.js"></script>
 <script src="./src/domain/Assembly.js"></script>

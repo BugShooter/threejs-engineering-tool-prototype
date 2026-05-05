@@ -155,6 +155,7 @@
   function createVisibleHiddenTargetStrategy() {
     return {
       id: 'visible-hidden',
+      labelKey: 'strategies.visibleHidden',
       label: 'Visible / Hidden',
       getDefaultThresholds: function() {
         return {

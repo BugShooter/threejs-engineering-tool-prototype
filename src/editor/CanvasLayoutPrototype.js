@@ -1,6 +1,30 @@
 (function() {
   const tool = window.EngineeringTool;
 
+  function getI18nInstance() {
+    return tool && tool.i18n && tool.i18n.instance ? tool.i18n.instance : null;
+  }
+
+  function interpolateTemplate(template, replacements) {
+    if (!replacements) {
+      return template;
+    }
+    return String(template).replace(/\{\{?\s*([\w.]+)\s*\}?\}/g, function(match, key) {
+      return Object.prototype.hasOwnProperty.call(replacements, key) ? replacements[key] : match;
+    });
+  }
+
+  function t(path, fallback, replacements) {
+    const i18n = getI18nInstance();
+    if (i18n && typeof i18n.t === 'function') {
+      const translated = i18n.t(path, replacements);
+      if (typeof translated === 'string' && translated !== path) {
+        return interpolateTemplate(translated, replacements);
+      }
+    }
+    return interpolateTemplate(fallback, replacements);
+  }
+
   function ensurePrototypeStyles() {
     if (document.getElementById('canvas-layout-prototype-styles')) {
       return;
@@ -52,7 +76,7 @@
       '.canvas-layout-widget-number:focus{border-color:#5a8fff;}',
       '.canvas-layout-widget-actions{display:flex;flex-wrap:wrap;gap:6px;}',
       '.canvas-layout-widget-actions .canvas-layout-button{flex:1 1 140px;min-width:0;}',
-      '.canvas-layout-status-chip{display:flex;align-items:center;gap:6px;padding:6px 9px;border:1px solid #324264;border-radius:999px;background:rgba(23,30,44,.92);color:#dce6ff;box-shadow:0 10px 24px rgba(0,0,0,.2);}',
+      '.canvas-layout-status-chip{display:flex;align-items:center;gap:6px;padding:6px 9px;border:1px solid #324264;border-radius:8px;background:rgba(23,30,44,.92);color:#dce6ff;box-shadow:0 10px 24px rgba(0,0,0,.2);}',
       '.canvas-layout-status-chip.is-hidden{display:none;}',
       '.canvas-layout-status-chip.is-active{border-color:#20ff88;color:#dfffea;background:rgba(16,41,31,.92);}',
       '.canvas-layout-status-chip-label{font-size:7px;letter-spacing:.08em;text-transform:uppercase;color:#8da1cc;}',
@@ -220,11 +244,11 @@
       : [
           {
             id: 'modes',
-            label: 'Режимы',
+            label: 'Modes',
             cards: [
               {
-                title: 'Тестовые режимы',
-                lines: ['Сборка', 'Осмотр', 'Презентация']
+                title: 'Test modes',
+                lines: ['Build', 'Inspect', 'Present']
               }
             ]
           }
@@ -232,9 +256,9 @@
     const iconRailItems = Array.isArray(config.iconRailItems) && config.iconRailItems.length
       ? config.iconRailItems
       : [
-          { icon: '⌂', label: 'Обзор' },
-          { icon: '⊕', label: 'Добавить' },
-          { icon: '⚙', label: 'Инструменты' },
+          { icon: '⌂', label: 'Overview' },
+          { icon: '⊕', label: 'Add' },
+          { icon: '⚙', label: 'Tools' },
           { icon: '◌', label: 'Debug' }
         ];
     const centerWidgets = Array.isArray(config.centerWidgets) ? config.centerWidgets.filter(Boolean) : [];
@@ -243,32 +267,26 @@
       : [
           {
             id: 'project',
-            label: 'Проект',
+            label: 'Project',
             buttons: [
               {
-                label: 'Экспорт JSON',
-                caption: 'Сохранить состояние',
+                label: 'Export JSON',
+                caption: 'Save the current state',
                 tone: 'accent',
                 onClick: typeof config.onExportProject === 'function' ? config.onExportProject : null
               },
               {
-                label: 'Импорт JSON',
-                caption: 'Загрузить файл',
+                label: 'Import JSON',
+                caption: 'Load a file',
                 onClick: typeof config.onImportProject === 'function' ? config.onImportProject : null
-              }
-            ],
-            cards: [
-              {
-                title: 'Пакет проекта',
-                lines: ['экспорт сборки', 'импорт ранее сохранённого проекта', 'заготовка под share/readme flow']
               }
             ]
           },
           {
             id: 'settings',
-            label: 'Настройки',
+            label: 'Settings',
             renderContent: typeof config.renderSettingsTab === 'function' ? config.renderSettingsTab : null,
-            choicesLabel: typeof config.renderSettingsTab === 'function' ? null : 'Стратегия выбора цели',
+            choicesLabel: typeof config.renderSettingsTab === 'function' ? null : 'Target selection strategy',
             choices: typeof config.renderSettingsTab === 'function' ? [] : [
               { label: 'Visible / Hidden', active: true },
               { label: 'Planned Alt' },
@@ -276,27 +294,27 @@
             ],
             cards: typeof config.renderSettingsTab === 'function' ? [] : [
               {
-                title: 'Общие настройки',
-                lines: ['селектор стратегии можно перенести сюда', 'режим выравнивания и camera hints рядом', 'подготовка к замене текущей shell-панели']
+                title: 'General settings',
+                lines: ['the strategy selector can move here', 'alignment mode and camera hints stay nearby', 'preparation for replacing the current shell panel']
               }
             ]
           },
           {
             id: 'debug',
-            label: 'Отладка',
+            label: 'Debug',
             renderContent: typeof config.renderDebugTab === 'function' ? config.renderDebugTab : null,
-            togglesLabel: typeof config.renderDebugTab === 'function' ? null : 'Опции отладки',
+            togglesLabel: typeof config.renderDebugTab === 'function' ? null : 'Debug options',
             toggles: typeof config.renderDebugTab === 'function' ? [] : [
-              { label: 'Луч', checked: true },
+              { label: 'Ray', checked: true },
               { label: 'Hit point', checked: true },
-              { label: 'Нормаль', checked: true },
+              { label: 'Normal', checked: true },
               { label: 'Exact plane', checked: true },
               { label: 'Hover shortlist', checked: false }
             ],
             cards: typeof config.renderDebugTab === 'function' ? [] : [
               {
-                title: 'Диагностика',
-                lines: ['контролы пока тестовые', 'реальный перенос будет после утверждения layout', 'production UX и debug останутся разделены']
+                title: 'Diagnostics',
+                lines: ['controls are still provisional', 'the real migration starts after the layout is approved', 'production UX and debug stay separated']
               }
             ]
           }
@@ -306,11 +324,11 @@
       : [
           {
             id: 'catalog',
-            label: 'Каталог',
+            label: 'Catalog',
             cards: [
               {
-                title: 'Тестовые карточки',
-                lines: ['Профиль 200', 'Угол 90', 'Соединитель straight', 'Пользовательская библиотека позже']
+                title: 'Test cards',
+                lines: ['Profile 200', 'Angle 90', 'Straight connector', 'Custom library later']
               }
             ],
             chips: ['catalog', 'drawer candidate', 'stretch-x']
@@ -403,17 +421,17 @@
                     }
                   : {
                       type: 'group',
-                      title: 'Центральная группа',
-                      note: 'Пример группы элементов внутри центрированной ячейки. Это не production toolbar, а sandbox для проверки поведения layout.',
+                      title: 'Center group',
+                      note: 'Example group inside a centered slot. This is not a production toolbar, but a sandbox for layout behavior.',
                       direction: 'row',
                       buttons: [
                         {
-                          label: 'Выбрать узел',
+                          label: 'Select node',
                           caption: 'Standalone action',
                           tone: 'accent'
                         },
                         {
-                          label: 'Снимок сцены',
+                          label: 'Scene snapshot',
                           caption: 'Placeholder action'
                         },
                         {
@@ -852,7 +870,7 @@
       if (state.fullscreen) {
         const closeButton = createElement('button', 'canvas-layout-tab-action', '×');
         closeButton.type = 'button';
-        closeButton.title = 'Закрыть fullscreen';
+        closeButton.title = t('tooltips.closeFullscreen', 'Close fullscreen');
         closeButton.addEventListener('click', function(event) {
           event.preventDefault();
           exitFullscreen();
@@ -863,7 +881,9 @@
 
       const fullscreenButton = createElement('button', 'canvas-layout-tab-action', state.fullscreen ? '↙' : '⤢');
       fullscreenButton.type = 'button';
-      fullscreenButton.title = state.fullscreen ? 'Выйти из fullscreen' : 'Развернуть почти на весь canvas';
+      fullscreenButton.title = state.fullscreen
+        ? t('tooltips.exitFullscreen', 'Exit fullscreen')
+        : t('tooltips.enterFullscreen', 'Expand to almost full canvas');
       fullscreenButton.addEventListener('click', function(event) {
         event.preventDefault();
         if (state.fullscreen) {
@@ -876,7 +896,9 @@
 
       const collapseButton = createElement('button', 'canvas-layout-tab-action', state.collapsed ? '▣' : '▤');
       collapseButton.type = 'button';
-      collapseButton.title = state.collapsed ? 'Развернуть panel' : 'Свернуть panel';
+      collapseButton.title = state.collapsed
+        ? t('tooltips.expandPanel', 'Expand panel')
+        : t('tooltips.collapsePanel', 'Collapse panel');
       collapseButton.addEventListener('click', function(event) {
         event.preventDefault();
         state.collapsed = !state.collapsed;
@@ -947,7 +969,7 @@
     const mount = createElement('div', 'canvas-layout-drawer-mount');
     const panel = createElement('section', 'canvas-layout-drawer-panel');
     const body = createElement('div', 'canvas-layout-drawer-body');
-    const handle = createElement('button', 'canvas-layout-drawer-handle', (config.handleLabel || config.label || 'Панель').trim());
+    const handle = createElement('button', 'canvas-layout-drawer-handle', (config.handleLabel || config.label || 'Panel').trim());
     const drawerWidthValue = config.width || '296px';
     const handleSizeValue = config.handleSize || '32px';
     const drawerWidthPx = parseFloat(drawerWidthValue);
@@ -982,8 +1004,10 @@
     });
 
     function render() {
-      const label = (config.label || config.handleLabel || 'Панель').trim();
-      const actionText = state.open ? 'Скрыть' : 'Показать';
+      const label = (config.label || config.handleLabel || 'Panel').trim();
+      const handleTitle = state.open
+        ? t('tooltips.hidePanel', 'Hide panel: {label}', { label: label })
+        : t('tooltips.showPanel', 'Show panel: {label}', { label: label });
       panel.classList.toggle('is-open', state.open);
       panel.style.transform = state.open
         ? 'translateX(0px)'
@@ -1001,8 +1025,8 @@
       body.setAttribute('aria-hidden', state.open ? 'false' : 'true');
       handle.style.pointerEvents = 'auto';
       handle.textContent = config.handleLabel || label;
-      handle.title = `${actionText} панель: ${label}`;
-      handle.setAttribute('aria-label', `${actionText} панель: ${label}`);
+      handle.title = handleTitle;
+      handle.setAttribute('aria-label', handleTitle);
       handle.setAttribute('aria-expanded', state.open ? 'true' : 'false');
     }
 
@@ -1020,7 +1044,7 @@
     const mount = createElement('div', 'canvas-layout-edge-drawer-mount');
     const panel = createElement('section', 'canvas-layout-edge-drawer-panel');
     const body = createElement('div', 'canvas-layout-edge-drawer-body');
-    const handle = createElement('button', 'canvas-layout-edge-drawer-handle', (config.handleLabel || config.label || 'Панель').trim());
+    const handle = createElement('button', 'canvas-layout-edge-drawer-handle', (config.handleLabel || config.label || 'Panel').trim());
     const drawerWidthValue = config.width || '296px';
     const handleSizeValue = config.handleSize || '32px';
     const visibleEdgeWidthValue = config.visibleEdgeWidth || null;
@@ -1118,8 +1142,10 @@
     });
 
     function render() {
-      const label = (config.label || config.handleLabel || 'Панель').trim();
-      const actionText = state.open ? 'Скрыть' : 'Показать';
+      const label = (config.label || config.handleLabel || 'Panel').trim();
+      const handleTitle = state.open
+        ? t('tooltips.hidePanel', 'Hide panel: {label}', { label: label })
+        : t('tooltips.showPanel', 'Show panel: {label}', { label: label });
       panel.classList.toggle('is-open', state.open);
       panel.classList.toggle('is-peeking', !state.open && state.peeking);
       panel.style.transform = state.open
@@ -1137,8 +1163,8 @@
       }
       body.setAttribute('aria-hidden', state.open ? 'false' : 'true');
       handle.textContent = config.handleLabel || label;
-      handle.title = `${actionText} панель: ${label}`;
-      handle.setAttribute('aria-label', `${actionText} панель: ${label}`);
+      handle.title = handleTitle;
+      handle.setAttribute('aria-label', handleTitle);
       handle.setAttribute('aria-expanded', state.open ? 'true' : 'false');
       handle.style.opacity = state.open ? '1' : (state.peeking ? '1' : '.96');
     }

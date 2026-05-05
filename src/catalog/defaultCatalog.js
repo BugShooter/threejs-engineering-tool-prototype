@@ -7,7 +7,8 @@
       {
         typeId: 'profile-20x20',
         category: 'profile',
-        label: 'Профиль 20x20',
+        label: 'Profile 20x20',
+        labelKey: 'partTypes.profile20x20',
         params: {
           length: { type: 'number', min: 40, max: 800, step: 5, default: 200 }
         },
@@ -132,7 +133,8 @@
       {
         typeId: 'connector-straight-20',
         category: 'connector',
-        label: 'Соед. прямой',
+        label: 'Straight connector',
+        labelKey: 'partTypes.connectorStraight20',
         geometry: {
           kind: 'straight-connector',
           bodyLength: 36.4,
@@ -180,7 +182,8 @@
       {
         typeId: 'connector-angle-20',
         category: 'connector',
-        label: 'Соед. угловой',
+        label: 'Angle connector',
+        labelKey: 'partTypes.connectorAngle20',
         geometry: {
           kind: 'angle-connector',
           armLength: 26,

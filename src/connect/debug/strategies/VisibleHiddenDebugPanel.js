@@ -1,5 +1,13 @@
 (function() {
   const tool = window.EngineeringTool;
+  const i18n = tool.i18n && tool.i18n.instance ? tool.i18n.instance : null;
+
+  function t(key) {
+    if (!i18n || !key) {
+      return key;
+    }
+    return i18n.t(key);
+  }
 
   function createCheckbox(config, state, onChange) {
     const label = document.createElement('label');
@@ -59,26 +67,28 @@
     root.style.boxSizing = 'border-box';
 
     const checkboxConfigs = [
-      { key: 'showVisibleCandidates', label: 'Visible candidates' },
-      { key: 'showHiddenCandidates', label: 'Hidden candidates' },
-      { key: 'showHiddenActivationZone', label: 'Hidden activation zone' },
-      { key: 'showScreenPolygons', label: 'Screen polygons' },
-      { key: 'showCandidateScores', label: 'Candidate scores' }
+      { key: 'showVisibleCandidates', labelKey: 'visibleHiddenDebug.showVisibleCandidates' },
+      { key: 'showHiddenCandidates', labelKey: 'visibleHiddenDebug.showHiddenCandidates' },
+      { key: 'showHiddenActivationZone', labelKey: 'visibleHiddenDebug.showHiddenActivationZone' },
+      { key: 'showScreenPolygons', labelKey: 'visibleHiddenDebug.showScreenPolygons' },
+      { key: 'showCandidateScores', labelKey: 'visibleHiddenDebug.showCandidateScores' }
     ];
     const numberConfigs = [
-      { key: 'visibleScreenMargin', label: 'Visible margin', min: 0, max: 100, step: 1 },
-      { key: 'visibleLockDistance', label: 'Visible lock', min: 0, max: 200, step: 1 },
-      { key: 'hiddenRayThresholdFixed', label: 'Hidden fixed', min: 0, max: 200, step: 1 },
-      { key: 'hiddenRayThresholdTrack', label: 'Hidden track', min: 0, max: 200, step: 1 },
-      { key: 'hiddenPartThreshold', label: 'Hidden part dist', min: 0, max: 400, step: 1 }
+      { key: 'visibleScreenMargin', labelKey: 'visibleHiddenDebug.visibleScreenMargin', min: 0, max: 100, step: 1 },
+      { key: 'visibleLockDistance', labelKey: 'visibleHiddenDebug.visibleLockDistance', min: 0, max: 200, step: 1 },
+      { key: 'hiddenRayThresholdFixed', labelKey: 'visibleHiddenDebug.hiddenRayThresholdFixed', min: 0, max: 200, step: 1 },
+      { key: 'hiddenRayThresholdTrack', labelKey: 'visibleHiddenDebug.hiddenRayThresholdTrack', min: 0, max: 200, step: 1 },
+      { key: 'hiddenPartThreshold', labelKey: 'visibleHiddenDebug.hiddenPartThreshold', min: 0, max: 400, step: 1 }
     ];
 
     function render() {
       root.innerHTML = '';
       for (const checkboxConfig of checkboxConfigs) {
+        checkboxConfig.label = t(checkboxConfig.labelKey);
         root.appendChild(createCheckbox(checkboxConfig, config.strategyDebugOptions, config.onChange));
       }
       for (const numberConfig of numberConfigs) {
+        numberConfig.label = t(numberConfig.labelKey);
         root.appendChild(createNumberRow(numberConfig, config.selectionConfig, config.onChange));
       }
     }

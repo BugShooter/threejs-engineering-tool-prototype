@@ -1,5 +1,13 @@
 (function() {
   const tool = window.EngineeringTool;
+  const i18n = tool.i18n && tool.i18n.instance ? tool.i18n.instance : null;
+
+  function t(key) {
+    if (!i18n || !key) {
+      return key;
+    }
+    return i18n.t(key);
+  }
 
   function createTargetSelectionStrategyRegistry(options) {
     const config = Object.assign({
@@ -49,8 +57,8 @@
       return Array.from(strategies.values()).map(function(strategy) {
         return {
           id: strategy.id,
-          label: strategy.label || strategy.id,
-          description: strategy.description || ''
+          label: strategy.labelKey ? t(strategy.labelKey) : (strategy.label || strategy.id),
+          description: strategy.descriptionKey ? t(strategy.descriptionKey) : (strategy.description || '')
         };
       });
     }

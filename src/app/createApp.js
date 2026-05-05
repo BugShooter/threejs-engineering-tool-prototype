@@ -23,6 +23,7 @@
   const createBuiltInTargetSelectionStrategies = tool.connect.createBuiltInTargetSelectionStrategies;
   const createGizmoManager = tool.editor.createGizmoManager;
   const SnapSolver = tool.engine.SnapSolver;
+  const i18n = tool.i18n && tool.i18n.instance ? tool.i18n.instance : null;
 
   const PROFILE_SIZE = 20;
   const CLICK_DRAG_THRESHOLD = 6;
@@ -37,6 +38,31 @@
 
   function createApp() {
     const elements = {
+      topbarTitle: document.getElementById('app-topbar-title'),
+      topbarSubtitle: document.getElementById('app-topbar-subtitle'),
+      topbarLanguageLabel: document.getElementById('app-topbar-language-label'),
+      topbarLanguageSelect: document.getElementById('app-topbar-language-select'),
+      topbarProfileName: document.getElementById('app-topbar-profile-name'),
+      topbarProfileMeta: document.getElementById('app-topbar-profile-meta'),
+      legacyHeading: document.getElementById('legacy-heading'),
+      legacySectionAdd: document.getElementById('legacy-section-add'),
+      legacySectionSelected: document.getElementById('legacy-section-selected'),
+      legacySectionJoint: document.getElementById('legacy-section-joint'),
+      legacySectionStrategy: document.getElementById('legacy-section-strategy'),
+      legacySectionAlignment: document.getElementById('legacy-section-alignment'),
+      legacySectionDebug: document.getElementById('legacy-section-debug'),
+      legacySectionFile: document.getElementById('legacy-section-file'),
+      legacyLengthLabel: document.getElementById('legacy-length-label'),
+      legacyLengthUnit: document.getElementById('legacy-length-unit'),
+      alignLabelText: document.getElementById('align-label-text'),
+      connectDebugLabelText: document.getElementById('connect-debug-label-text'),
+      debugShowRayLabel: document.getElementById('debug-show-ray-label'),
+      debugShowHitPointLabel: document.getElementById('debug-show-hit-point-label'),
+      debugShowPortNormalLabel: document.getElementById('debug-show-port-normal-label'),
+      debugShowExactPlaneLabel: document.getElementById('debug-show-exact-plane-label'),
+      debugShowLiftedOverlayLabel: document.getElementById('debug-show-lifted-overlay-label'),
+      debugShowContactFootprintLabel: document.getElementById('debug-show-contact-footprint-label'),
+      debugShowShortlistLabel: document.getElementById('debug-show-shortlist-label'),
       wrap: document.getElementById('canvas-wrap'),
       canvas: document.getElementById('c'),
       snapBadge: document.getElementById('snap-badge'),
@@ -71,7 +97,8 @@
       debugShowShortlist: document.getElementById('debug-show-shortlist'),
       exportButton: document.getElementById('btn-export-json'),
       importButton: document.getElementById('btn-import-json'),
-      importInput: document.getElementById('input-import-json')
+      importInput: document.getElementById('input-import-json'),
+      hint: document.getElementById('hint')
     };
 
     const catalog = new PartCatalog(tool.catalog.defaultCatalogData);
@@ -218,6 +245,223 @@
     let snapStatusWidget = null;
     let modeStatusWidget = null;
     let interactionStatusWidget = null;
+
+    function t(key, replacements) {
+      if (!i18n || !key) {
+        return key;
+      }
+      return i18n.t(key, replacements);
+    }
+
+    function getLocaleMessage(locale, path) {
+      const messages = tool.i18n && tool.i18n.locales ? tool.i18n.locales[locale] : null;
+      if (!messages || !path) {
+        return null;
+      }
+
+      return path.split('.').reduce(function(current, segment) {
+        return current && Object.prototype.hasOwnProperty.call(current, segment)
+          ? current[segment]
+          : null;
+      }, messages);
+    }
+
+    function getSupportedLocales() {
+      return ['en', 'de', 'uk', 'ru'].filter(function(locale) {
+        return !!getLocaleMessage(locale, 'locale.name');
+      });
+    }
+
+    function getLocaleFlag(locale) {
+      const localeFlags = {
+        en: '🇬🇧',
+        de: '🇩🇪',
+        uk: '🇺🇦',
+        ru: '🇷🇺'
+      };
+      return localeFlags[locale] || '🏳️';
+    }
+
+    function setButtonLabel(button, icon, label) {
+      if (!button) {
+        return;
+      }
+      button.textContent = `${icon} ${label}`;
+    }
+
+    function getBooleanLabel(value) {
+      return t(value ? 'common.on' : 'common.off');
+    }
+
+    function formatMillimeters(value) {
+      return `${value} ${t('common.mm')}`;
+    }
+
+    function getPartTypeLabel(typeDef) {
+      if (!typeDef) {
+        return t('common.dash');
+      }
+      return typeDef.labelKey ? t(typeDef.labelKey) : (typeDef.label || typeDef.typeId || t('common.dash'));
+    }
+
+    function formatModeLabelText(value) {
+      if (!value || value === '—') {
+        return t('common.dash');
+      }
+
+      if (value.indexOf('MOVE ') === 0) {
+        return t('modes.moveAxis', { axis: value.slice(5) });
+      }
+      if (value.indexOf('ROTATE ') === 0) {
+        return t('modes.rotateAxis', { axis: value.slice(7) });
+      }
+      if (value.indexOf('LENGTH ') === 0) {
+        return t('modes.lengthEnd', { end: value.slice(7) });
+      }
+
+      const mapping = {
+        CONNECTED: 'modes.connected',
+        ADJUSTED: 'modes.adjusted',
+        'ADJUST JOINT': 'modes.adjustJoint',
+        'NO SOURCE PORT': 'modes.noSourcePort',
+        CONNECT: 'modes.connect',
+        'CONNECT TARGET': 'modes.connectTarget',
+        'RESIZE LOCKED': 'modes.resizeLocked',
+        DRAG: 'modes.drag',
+        JOINT: 'modes.joint',
+        SELECT: 'modes.select',
+        ORBIT: 'modes.orbit'
+      };
+
+      return mapping[value] ? t(mapping[value]) : value;
+    }
+
+    function populateLanguageSelector() {
+      if (!elements.topbarLanguageSelect) {
+        return;
+      }
+
+      const activeLocale = i18n ? i18n.getLocale() : 'en';
+      elements.topbarLanguageSelect.innerHTML = '';
+
+      getSupportedLocales().forEach(function(locale) {
+        const option = document.createElement('option');
+        option.value = locale;
+        option.textContent = `${getLocaleFlag(locale)} ${getLocaleMessage(locale, 'locale.name') || locale.toUpperCase()}`;
+        elements.topbarLanguageSelect.appendChild(option);
+      });
+
+      elements.topbarLanguageSelect.value = activeLocale;
+    }
+
+    function syncStaticUiText() {
+      document.title = t('document.title');
+      if (elements.topbarTitle) {
+        elements.topbarTitle.textContent = t('topbar.title');
+      }
+      if (elements.topbarSubtitle) {
+        elements.topbarSubtitle.textContent = t('topbar.subtitle');
+      }
+      if (elements.topbarLanguageLabel) {
+        elements.topbarLanguageLabel.textContent = t('topbar.language');
+      }
+      if (elements.topbarProfileName) {
+        elements.topbarProfileName.textContent = t('topbar.profileName');
+      }
+      if (elements.topbarProfileMeta) {
+        elements.topbarProfileMeta.textContent = t('topbar.profileMeta');
+      }
+      populateLanguageSelector();
+      if (elements.topbarLanguageSelect) {
+        elements.topbarLanguageSelect.setAttribute('aria-label', t('topbar.language'));
+      }
+      if (elements.legacyHeading) {
+        elements.legacyHeading.textContent = t('legacy.heading');
+      }
+      if (elements.legacySectionAdd) {
+        elements.legacySectionAdd.textContent = t('legacy.sections.add');
+      }
+      if (elements.legacySectionSelected) {
+        elements.legacySectionSelected.textContent = t('legacy.sections.selected');
+      }
+      if (elements.legacySectionJoint) {
+        elements.legacySectionJoint.textContent = t('legacy.sections.connection');
+      }
+      if (elements.legacySectionStrategy) {
+        elements.legacySectionStrategy.textContent = t('legacy.sections.strategy');
+      }
+      if (elements.legacySectionAlignment) {
+        elements.legacySectionAlignment.textContent = t('legacy.sections.alignment');
+      }
+      if (elements.legacySectionDebug) {
+        elements.legacySectionDebug.textContent = t('legacy.sections.debug');
+      }
+      if (elements.legacySectionFile) {
+        elements.legacySectionFile.textContent = t('legacy.sections.file');
+      }
+      if (elements.legacyLengthLabel) {
+        elements.legacyLengthLabel.textContent = t('legacy.fields.length');
+      }
+      if (elements.legacyLengthUnit) {
+        elements.legacyLengthUnit.textContent = t('common.mm');
+      }
+      if (elements.alignLabelText) {
+        elements.alignLabelText.textContent = t('actions.alignment');
+      }
+      if (elements.connectDebugLabelText) {
+        elements.connectDebugLabelText.textContent = t('actions.portDebug');
+      }
+      if (elements.debugShowRayLabel) {
+        elements.debugShowRayLabel.textContent = t('debug.showRay');
+      }
+      if (elements.debugShowHitPointLabel) {
+        elements.debugShowHitPointLabel.textContent = t('debug.showHitPoint');
+      }
+      if (elements.debugShowPortNormalLabel) {
+        elements.debugShowPortNormalLabel.textContent = t('debug.showPortNormal');
+      }
+      if (elements.debugShowExactPlaneLabel) {
+        elements.debugShowExactPlaneLabel.textContent = t('debug.showExactPlane');
+      }
+      if (elements.debugShowLiftedOverlayLabel) {
+        elements.debugShowLiftedOverlayLabel.textContent = t('debug.showLiftedOverlay');
+      }
+      if (elements.debugShowContactFootprintLabel) {
+        elements.debugShowContactFootprintLabel.textContent = t('debug.showContactFootprint');
+      }
+      if (elements.debugShowShortlistLabel) {
+        elements.debugShowShortlistLabel.textContent = t('debug.showShortlist');
+      }
+      setButtonLabel(elements.addProfileButton, '▬', t('actions.profile'));
+      setButtonLabel(elements.addAngleButton, '⌐', t('actions.angle'));
+      setButtonLabel(elements.addStraightButton, '—', t('actions.straight'));
+      setButtonLabel(elements.connectButton, '⊕', t('actions.connect'));
+      setButtonLabel(elements.disconnectButton, '⇄', t('actions.disconnect'));
+      setButtonLabel(elements.deleteButton, '✕', t('actions.delete'));
+      setButtonLabel(elements.splitJointButton, '⟂', t('actions.split'));
+      setButtonLabel(elements.resetCameraButton, '⌂', t('actions.resetView'));
+      setButtonLabel(elements.exportButton, '⇩', t('actions.exportJson'));
+      setButtonLabel(elements.importButton, '⇧', t('actions.importJson'));
+      if (elements.hint) {
+        elements.hint.innerHTML = t('legacy.hintHtml');
+      }
+      if (elements.snapBadge) {
+        elements.snapBadge.textContent = t('status.snapBadge');
+      }
+      if (elements.alignState) {
+        elements.alignState.textContent = getBooleanLabel(snapAlign);
+      }
+      if (elements.connectDebugState) {
+        elements.connectDebugState.textContent = getBooleanLabel(connectDebugEnabled);
+      }
+    }
+
+    function handleLocaleSelectChange() {
+      if (!i18n || !elements.topbarLanguageSelect) {
+        return;
+      }
+      i18n.setLocale(elements.topbarLanguageSelect.value);
+    }
 
     function clampProfileLength(value) {
       return Math.max(40, Math.min(800, Number(value) || 200));
@@ -392,7 +636,7 @@
 
     function getResizeHandleInfo(part, sign) {
       if (!part || part.typeId !== 'profile-20x20') {
-        return { enabled: false, reason: 'Размер доступен только профилю.' };
+        return { enabled: false, reason: t('reasons.resizeOnlyProfile') };
       }
 
       const draggedPortId = sign > 0 ? 'endB' : 'endA';
@@ -408,7 +652,7 @@
           enabled: false,
           draggedPortId,
           fixedPortId,
-          reason: 'Тянуть можно только свободный торец профиля.'
+          reason: t('reasons.resizeFreeEndOnly')
         };
       }
 
@@ -529,7 +773,16 @@
     }
 
     function getTypeDef(part) {
-      return catalog.getType(part.typeId);
+      const typeDef = catalog.getType(part.typeId);
+      if (!typeDef) {
+        return null;
+      }
+      if (!typeDef.labelKey) {
+        return typeDef;
+      }
+      return Object.assign({}, typeDef, {
+        label: getPartTypeLabel(typeDef)
+      });
     }
 
     function removePartView(partId) {
@@ -782,6 +1035,20 @@
       }
     }
 
+    function createHudField(label, value) {
+      return `<div><span class="kv">${label}:</span> <span class="v">${value}</span></div>`;
+    }
+
+    function createHudCoordinates(position) {
+      return `<div><span class="kv">X:</span> <span class="v">${position.x.toFixed(0)}</span> ` +
+        `<span class="kv">Y:</span> <span class="v">${position.y.toFixed(0)}</span> ` +
+        `<span class="kv">Z:</span> <span class="v">${position.z.toFixed(0)}</span></div>`;
+    }
+
+    function formatSignedMillimeters(value) {
+      return `${value >= 0 ? '+' : ''}${value.toFixed(0)} ${t('common.mm')}`;
+    }
+
     function updateInteractionHud() {
       if (mode === 'dragPart' && activeInteraction) {
         const part = getPart(activeInteraction.rootPartId);
@@ -793,14 +1060,12 @@
         const typeDef = getTypeDef(part);
         const position = activeInteraction.currentRootPosition || getPartPositionVector(part);
         const snapLine = activeSnap && activeSnap.targetPort
-          ? `<div><span class="kv">Цель:</span> <span class="v">${activeSnap.targetPort.partId} · ${activeSnap.targetPort.portId}</span></div>`
+          ? createHudField(t('hud.target'), `${activeSnap.targetPort.partId} · ${activeSnap.targetPort.portId}`)
           : '';
         showInteractionHud(
           `<div class="ttl">${typeDef.label} #${part.id}</div>` +
-          `<div><span class="kv">X:</span> <span class="v">${position.x.toFixed(0)}</span> ` +
-          `<span class="kv">Y:</span> <span class="v">${position.y.toFixed(0)}</span> ` +
-          `<span class="kv">Z:</span> <span class="v">${position.z.toFixed(0)}</span></div>` +
-          `<div><span class="kv">Подсборка:</span> <span class="v">${activeInteraction.partIds.length}</span></div>` +
+          createHudCoordinates(position) +
+          createHudField(t('selection.subassembly'), activeInteraction.partIds.length) +
           snapLine
         );
         return;
@@ -816,13 +1081,13 @@
         const typeDef = getTypeDef(part);
         const lengthDelta = part.params.length - lStartLen;
         const snapLine = lResizeSnap && lResizeSnap.targetPort
-          ? `<div><span class="kv">Snap:</span> <span class="v">${lResizeSnap.targetPort.partId} · ${lResizeSnap.targetPort.portId}</span></div>`
+          ? createHudField(t('hud.snap'), `${lResizeSnap.targetPort.partId} · ${lResizeSnap.targetPort.portId}`)
           : '';
         showInteractionHud(
           `<div class="ttl">${typeDef.label} #${part.id}</div>` +
-          `<div><span class="kv">Торец:</span> <span class="v">${lSign > 0 ? 'B' : 'A'}</span></div>` +
-          `<div><span class="kv">Длина:</span> <span class="v">${part.params.length} мм</span></div>` +
-          `<div><span class="kv">Δ:</span> <span class="v">${lengthDelta >= 0 ? '+' : ''}${lengthDelta.toFixed(0)} мм</span></div>` +
+          createHudField(t('hud.end'), lSign > 0 ? 'B' : 'A') +
+          createHudField(t('selection.length'), formatMillimeters(part.params.length)) +
+          createHudField(t('hud.delta'), formatSignedMillimeters(lengthDelta)) +
           snapLine
         );
         return;
@@ -840,11 +1105,9 @@
         const travel = position.clone().sub(tStartPos).dot(tAxis);
         showInteractionHud(
           `<div class="ttl">${typeDef.label} #${part.id}</div>` +
-          `<div><span class="kv">Ось:</span> <span class="v">${activeTranslateAxis ? activeTranslateAxis.toUpperCase() : '—'}</span></div>` +
-          `<div><span class="kv">Δ:</span> <span class="v">${travel >= 0 ? '+' : ''}${travel.toFixed(0)} мм</span></div>` +
-          `<div><span class="kv">X:</span> <span class="v">${position.x.toFixed(0)}</span> ` +
-          `<span class="kv">Y:</span> <span class="v">${position.y.toFixed(0)}</span> ` +
-          `<span class="kv">Z:</span> <span class="v">${position.z.toFixed(0)}</span></div>`
+          createHudField(t('hud.axis'), activeTranslateAxis ? activeTranslateAxis.toUpperCase() : t('common.dash')) +
+          createHudField(t('hud.delta'), formatSignedMillimeters(travel)) +
+          createHudCoordinates(position)
         );
         return;
       }
@@ -860,8 +1123,8 @@
         const angleDegrees = THREE.MathUtils.radToDeg(activeRotateDelta);
         showInteractionHud(
           `<div class="ttl">${typeDef.label} #${part.id}</div>` +
-          `<div><span class="kv">Ось:</span> <span class="v">${activeRotateAxis.toUpperCase()}</span></div>` +
-          `<div><span class="kv">Угол:</span> <span class="v">${angleDegrees >= 0 ? '+' : ''}${angleDegrees.toFixed(1)}°</span></div>`
+          createHudField(t('hud.axis'), activeRotateAxis.toUpperCase()) +
+          createHudField(t('hud.angle'), `${angleDegrees >= 0 ? '+' : ''}${angleDegrees.toFixed(1)}°`)
         );
         return;
       }
@@ -876,9 +1139,9 @@
         const typeDef = getTypeDef(part);
         showInteractionHud(
           `<div class="ttl">${typeDef.label} #${part.id}</div>` +
-          `<div><span class="kv">Режим:</span> <span class="v">Соединить</span></div>` +
-          `<div><span class="kv">Шаг:</span> <span class="v">Выберите исходный порт</span></div>` +
-          `<div><span class="kv">Доступно:</span> <span class="v">${connectState.sourceCandidates.length}</span></div>`
+          createHudField(t('hud.mode'), t('modes.connect')) +
+          createHudField(t('hud.step'), t('hud.chooseSourcePort')) +
+          createHudField(t('hud.available'), connectState.sourceCandidates.length)
         );
         return;
       }
@@ -893,21 +1156,21 @@
         const typeDef = getTypeDef(part);
         const variantCount = connectState.activeTargetSnapVariants ? connectState.activeTargetSnapVariants.length : 0;
         const variantLine = variantCount > 1
-          ? `<div><span class="kv">Ориентация:</span> <span class="v">${connectState.activeTargetVariantIndex + 1}/${variantCount}</span></div>`
+          ? createHudField(t('hud.orientation'), `${connectState.activeTargetVariantIndex + 1}/${variantCount}`)
           : '';
         const variantHintLine = variantCount > 1
-          ? `<div><span class="kv">Смена:</span> <span class="v">← → / 1-${Math.min(variantCount, 9)}</span></div>`
+          ? createHudField(t('hud.switch'), `← → / 1-${Math.min(variantCount, 9)}`)
           : '';
         const targetLine = connectState.activeTarget
-          ? `<div><span class="kv">Цель:</span> <span class="v">${connectState.activeTarget.port.partId} · ${connectState.activeTarget.port.portId}</span></div>`
-          : `<div><span class="kv">Цель:</span> <span class="v">Наведите курсор на порт</span></div>`;
+          ? createHudField(t('hud.target'), `${connectState.activeTarget.port.partId} · ${connectState.activeTarget.port.portId}`)
+          : createHudField(t('hud.target'), t('hud.hoverPort'));
         showInteractionHud(
           `<div class="ttl">${typeDef.label} #${part.id}</div>` +
-          `<div><span class="kv">Source:</span> <span class="v">${connectState.sourcePort.portId}</span></div>` +
+          createHudField(t('hud.source'), connectState.sourcePort.portId) +
           `${targetLine}` +
           `${variantLine}` +
           `${variantHintLine}` +
-          `<div><span class="kv">Подтверждение:</span> <span class="v">ЛКМ</span></div>`
+          createHudField(t('hud.confirm'), t('common.lmb'))
         );
         return;
       }
@@ -926,7 +1189,7 @@
       }
 
       if (binding.stateElement) {
-        binding.stateElement.textContent = connectDebugEnabled ? 'ВКЛ' : 'ВЫКЛ';
+        binding.stateElement.textContent = getBooleanLabel(connectDebugEnabled);
         binding.stateElement.style.color = connectDebugEnabled ? '#66c2ff' : '#6070a0';
       }
       if (binding.optionsPanel) {
@@ -968,7 +1231,7 @@
       }
 
       if (binding.alignStateElement) {
-        binding.alignStateElement.textContent = snapAlign ? 'ВКЛ' : 'ВЫКЛ';
+        binding.alignStateElement.textContent = getBooleanLabel(snapAlign);
         binding.alignStateElement.style.color = snapAlign ? '#66c2ff' : '#6070a0';
       }
 
@@ -977,7 +1240,10 @@
       }
 
       if (binding.undoInfoElement) {
-        binding.undoInfoElement.textContent = `Шагов в истории: ${getUndoDepth()} / ${undoHistoryLimit}`;
+        binding.undoInfoElement.textContent = t('settings.undoDepth', {
+          count: getUndoDepth(),
+          limit: undoHistoryLimit
+        });
       }
 
       if (binding.undoButton) {
@@ -1243,7 +1509,7 @@
           sideLabel: null,
           rootPartLabel: rootPartId,
           canAdjust: false,
-          reason: 'Соединение не найдено',
+          reason: t('reasons.jointNotFound'),
           snapshot: null,
           snapVariants: [],
           initialVariantIndex: 0
@@ -1260,7 +1526,7 @@
           sideLabel: null,
           rootPartLabel: rootPartId,
           canAdjust: false,
-          reason: 'Сторона не относится к выбранной связи',
+          reason: t('reasons.adjustSideNotInJoint'),
           snapshot: null,
           snapVariants: [],
           initialVariantIndex: 0
@@ -1291,7 +1557,7 @@
         excludedJointIds: [joint.id]
       });
       if (detachedComponent.partIds.includes(side.oppositePartId)) {
-        result.reason = 'Сторона заблокирована: соединение входит в замкнутый контур';
+        result.reason = t('reasons.adjustLockedLoop');
         return result;
       }
 
@@ -1299,7 +1565,7 @@
         excludedJointIds: [joint.id]
       });
       if (!snapshot) {
-        result.reason = 'Не удалось собрать подузел для корректировки';
+        result.reason = t('reasons.adjustMissingSubassembly');
         return result;
       }
 
@@ -1307,7 +1573,7 @@
         return port.partId === side.rootPartId && port.portId === side.rootPortId;
       });
       if (!sourcePort) {
-        result.reason = 'Порт выбранной стороны недоступен для корректировки';
+        result.reason = t('reasons.adjustSourcePortUnavailable');
         return result;
       }
 
@@ -1316,7 +1582,7 @@
         ? (side.key === 'a' ? portPair.bPort : portPair.aPort)
         : null;
       if (!targetPort) {
-        result.reason = 'Не удалось восстановить вторую сторону соединения';
+        result.reason = t('reasons.adjustMissingOtherSide');
         return result;
       }
 
@@ -1338,8 +1604,8 @@
 
       if (snapVariants.length <= 1) {
         result.reason = snapVariants.length === 1
-          ? 'Для этой стороны доступна только одна ориентация'
-          : 'Не удалось восстановить варианты ориентации';
+          ? t('reasons.adjustOnlyOneOrientation')
+          : t('reasons.adjustMissingVariants');
         return result;
       }
 
@@ -1730,11 +1996,11 @@
       const partId = part.id;
       const typeDef = getTypeDef(part);
       const lines = [
-        `Позиция: ${part.transform.position[0].toFixed(0)}, ${part.transform.position[1].toFixed(0)}, ${part.transform.position[2].toFixed(0)}`,
-        `Связи: ${assembly.getJointCountForPart(part.id)}`
+        `${t('callout.position')}: ${part.transform.position[0].toFixed(0)}, ${part.transform.position[1].toFixed(0)}, ${part.transform.position[2].toFixed(0)}`,
+        `${t('selection.connections')}: ${assembly.getJointCountForPart(part.id)}`
       ];
       if (part.typeId === 'profile-20x20') {
-        lines.unshift(`Длина: ${part.params.length} мм`);
+        lines.unshift(`${t('selection.length')}: ${formatMillimeters(part.params.length)}`);
       }
 
       return {
@@ -1762,38 +2028,38 @@
         actions: [
           {
             icon: '⊕',
-            tooltip: canConnect ? 'Режим явного соединения через выбор порта' : 'Нет свободного source-порта для соединения',
+            tooltip: canConnect ? t('callout.explicitConnectMode') : t('callout.noFreeSourcePort'),
             disabled: !canConnect,
             onClick: beginConnectMode
           },
           {
             icon: '✥',
-            tooltip: 'Режим перемещения',
+            tooltip: t('callout.moveMode'),
             active: effectiveMode === 'move',
             onClick: function() { setGizmoMode('move'); }
           },
           {
             icon: '⟳',
-            tooltip: 'Режим вращения',
+            tooltip: t('callout.rotateMode'),
             active: effectiveMode === 'rotate',
             onClick: function() { setGizmoMode('rotate'); }
           },
           {
             icon: '↔',
-            tooltip: canResize ? 'Режим изменения длины' : 'Нужен свободный торец профиля для изменения длины',
+            tooltip: canResize ? t('callout.lengthMode') : t('callout.lengthModeBlocked'),
             active: effectiveMode === 'length',
             disabled: !canResize,
             onClick: function() { setGizmoMode('length'); }
           },
           {
             icon: '⇄',
-            tooltip: 'Отсоединить выбранную деталь',
+            tooltip: t('callout.disconnectSelectedPart'),
             disabled: assembly.getJointCountForPart(part.id) === 0,
             onClick: disconnectSelectedPart
           },
           {
             icon: '✕',
-            tooltip: 'Удалить выбранную деталь',
+            tooltip: t('callout.deleteSelectedPart'),
             danger: true,
             onClick: deleteSelected
           }
@@ -1841,47 +2107,47 @@
         getAvoidRect: function() {
           return getJointScreenRect(joint.id, 34);
         },
-        title: 'Корректировка соединения',
+        title: t('callout.adjustConnectionTitle'),
         lines: [
-          `Сторона: ${postConnectAdjustState.sideLabel || '—'}`,
+          `${t('callout.side')}: ${postConnectAdjustState.sideLabel || t('common.dash')}`,
           rootPart ? `${getTypeDef(rootPart).label} #${rootPart.id}` : postConnectAdjustState.rootPartLabel,
-          `Ориентация: ${postConnectAdjustState.previewVariantIndex + 1}/${variantCount}`,
-          isPreviewing ? 'Preview: новая ориентация' : 'Preview: текущее положение'
+          `${t('hud.orientation')}: ${postConnectAdjustState.previewVariantIndex + 1}/${variantCount}`,
+          isPreviewing ? t('callout.previewNewOrientation') : t('callout.previewCurrentPosition')
         ],
         actions: [
           {
             icon: '←',
-            label: 'Пред.',
+            label: t('actions.previous'),
             wide: true,
-            tooltip: 'Предыдущая ориентация (←)',
+            tooltip: t('callout.previousOrientation'),
             onClick: function() {
               cyclePostConnectAdjustVariant(-1);
             }
           },
           {
             icon: '→',
-            label: 'След.',
+            label: t('actions.next'),
             wide: true,
-            tooltip: 'Следующая ориентация (→)',
+            tooltip: t('callout.nextOrientation'),
             onClick: function() {
               cyclePostConnectAdjustVariant(1);
             }
           },
           {
             icon: '✓',
-            label: 'Готово',
+            label: t('actions.done'),
             wide: true,
-            tooltip: 'Применить ориентацию (Enter / ЛКМ)',
+            tooltip: t('callout.applyOrientation'),
             onClick: function() {
               finishPostConnectAdjust({ commit: true });
             }
           },
           {
             icon: '✕',
-            label: 'Отмена',
+            label: t('actions.cancel'),
             wide: true,
             danger: true,
-            tooltip: 'Отменить корректировку (Esc)',
+            tooltip: t('callout.cancelAdjustment'),
             onClick: function() {
               finishPostConnectAdjust({ commit: false });
             }
@@ -1918,11 +2184,11 @@
         getAvoidRect: function() {
           return getJointScreenRect(joint.id, 28);
         },
-        title: `Соединение ${joint.id}`,
+        title: t('callout.connectionTitle', { id: joint.id }),
         lines: [
           `${partA ? getTypeDef(partA).label : joint.a.partId} · ${joint.a.portId}`,
           `${partB ? getTypeDef(partB).label : joint.b.partId} · ${joint.b.portId}`,
-          `Правило: ${joint.ruleId}`
+          `${t('joint.rule')}: ${joint.ruleId}`
         ],
         actions: sideAnalyses.map(function(analysis) {
           return {
@@ -1930,7 +2196,7 @@
             label: analysis.sideLabel,
             wide: true,
             tooltip: analysis.canAdjust
-              ? `Повернуть ${analysis.sideLabel}: ${analysis.rootPartLabel}`
+              ? t('callout.rotateSide', { side: analysis.sideLabel, part: analysis.rootPartLabel })
               : `${analysis.sideLabel}: ${analysis.reason}`,
             disabled: !analysis.canAdjust,
             onHoverStart: function() {
@@ -1946,9 +2212,9 @@
         }).concat([
           {
             icon: '⟂',
-            label: 'Разорвать',
+            label: t('callout.split'),
             wide: true,
-            tooltip: 'Разорвать выбранную связь',
+            tooltip: t('callout.splitSelectedJoint'),
             danger: true,
             onClick: splitSelectedJoint
           }
@@ -1989,7 +2255,7 @@
       const position = part.transform.position;
       const jointCount = assembly.getJointCountForPart(part.id);
       const extra = part.typeId === 'profile-20x20'
-        ? `<br>Длина: <span class="hi">${part.params.length} мм</span>`
+        ? `<br>${t('selection.length')}: <span class="hi">${formatMillimeters(part.params.length)}</span>`
         : '';
 
       elements.selectionPanel.style.display = 'flex';
@@ -1997,8 +2263,8 @@
       elements.selectionInfo.innerHTML =
         `<span class="hi">${label} #${part.id}</span>${extra}<br>` +
         `X:${position[0].toFixed(0)} Y:${position[1].toFixed(0)} Z:${position[2].toFixed(0)}<br>` +
-        `Соединения: <span class="hi">${jointCount}</span><br>` +
-        `Подсборка: <span class="hi">${component.partIds.length}</span>`;
+        `${t('selection.connections')}: <span class="hi">${jointCount}</span><br>` +
+        `${t('selection.subassembly')}: <span class="hi">${component.partIds.length}</span>`;
       if (selectedPartWidget) {
         selectedPartWidget.update(buildSelectedPartWidgetState());
       }
@@ -2027,7 +2293,7 @@
         `<span class="hi">${joint.id}</span><br>` +
         `${labelA} · ${joint.a.portId}<br>` +
         `${labelB} · ${joint.b.portId}<br>` +
-        `Правило: <span class="hi">${joint.ruleId}</span>`;
+        `${t('joint.rule')}: <span class="hi">${joint.ruleId}</span>`;
       if (selectedJointWidget) {
         selectedJointWidget.update(buildSelectedJointWidgetState());
       }
@@ -2112,7 +2378,7 @@
     }
 
     function setModeLabel(text) {
-      currentModeLabelText = text || '—';
+      currentModeLabelText = formatModeLabelText(text || t('common.dash'));
       elements.modeLabel.textContent = currentModeLabelText;
       if (modeStatusWidget) {
         modeStatusWidget.update({ text: currentModeLabelText });
@@ -2523,7 +2789,7 @@
 
     function toggleAlign() {
       snapAlign = !snapAlign;
-      elements.alignState.textContent = snapAlign ? 'ВКЛ' : 'ВЫКЛ';
+      elements.alignState.textContent = getBooleanLabel(snapAlign);
       elements.alignState.style.color = snapAlign ? '#22ff88' : '#ff4455';
       refreshLayoutControls();
     }
@@ -2577,7 +2843,7 @@
 
     function createPrototypeConnectDebugTab(container) {
       const cleanups = [];
-      const commonOptionsLabel = createWidgetElement('div', 'canvas-layout-section-label', 'Общие флаги');
+      const commonOptionsLabel = createWidgetElement('div', 'canvas-layout-section-label', t('debug.commonFlags'));
       const toggleButton = document.createElement('button');
       toggleButton.type = 'button';
       toggleButton.className = 'canvas-layout-button';
@@ -2586,7 +2852,7 @@
 
       const toggleLabel = document.createElement('span');
       toggleLabel.className = 'canvas-layout-button-label';
-      toggleLabel.textContent = 'Портовый debug';
+      toggleLabel.textContent = t('actions.portDebug');
       toggleButton.appendChild(toggleLabel);
 
       const toggleState = document.createElement('span');
@@ -2608,13 +2874,13 @@
       }));
 
       const commonOptionConfigs = [
-        { key: 'showRay', label: 'Луч' },
-        { key: 'showHitPoint', label: 'Hit point' },
-        { key: 'showPortNormal', label: 'Нормаль' },
-        { key: 'showExactPlane', label: 'Exact plane' },
-        { key: 'showLiftedOverlay', label: 'Lifted overlay' },
-        { key: 'showContactFootprint', label: 'Footprint' },
-        { key: 'showShortlist', label: 'Hover shortlist' }
+        { key: 'showRay', label: t('debug.showRay') },
+        { key: 'showHitPoint', label: t('debug.showHitPoint') },
+        { key: 'showPortNormal', label: t('debug.showPortNormal') },
+        { key: 'showExactPlane', label: t('debug.showExactPlane') },
+        { key: 'showLiftedOverlay', label: t('debug.showLiftedOverlay') },
+        { key: 'showContactFootprint', label: t('debug.showContactFootprint') },
+        { key: 'showShortlist', label: t('debug.showShortlist') }
       ];
 
       for (const optionConfig of commonOptionConfigs) {
@@ -2628,7 +2894,7 @@
         cleanups.push(bindConnectDebugOption(input, optionConfig.key));
       }
 
-      const strategyLabel = createWidgetElement('div', 'canvas-layout-section-label', 'Стратегия');
+      const strategyLabel = createWidgetElement('div', 'canvas-layout-section-label', t('legacy.sections.strategy'));
       container.appendChild(strategyLabel);
 
       const strategyControls = document.createElement('div');
@@ -2654,7 +2920,7 @@
 
       const label = document.createElement('div');
       label.className = 'canvas-layout-section-label';
-      label.textContent = 'Стратегия выбора цели';
+      label.textContent = t('settings.targetStrategy');
       container.appendChild(label);
 
       const select = document.createElement('select');
@@ -2676,14 +2942,14 @@
 
       select.addEventListener('change', handleChange);
 
-      const alignLabel = createWidgetElement('div', 'canvas-layout-section-label', 'Выравнивание');
+      const alignLabel = createWidgetElement('div', 'canvas-layout-section-label', t('actions.alignment'));
       container.appendChild(alignLabel);
 
       const alignButton = document.createElement('button');
       alignButton.type = 'button';
       alignButton.className = 'canvas-layout-button';
       alignButton.style.width = '100%';
-      alignButton.appendChild(createWidgetElement('span', 'canvas-layout-button-label', 'Выравнивание'));
+      alignButton.appendChild(createWidgetElement('span', 'canvas-layout-button-label', t('actions.alignment')));
       const alignState = createWidgetElement('span', 'canvas-layout-button-caption', '');
       alignButton.appendChild(alignState);
       function handleAlignClick(event) {
@@ -2693,14 +2959,14 @@
       alignButton.addEventListener('click', handleAlignClick);
       container.appendChild(alignButton);
 
-      const undoLabel = createWidgetElement('div', 'canvas-layout-section-label', 'История отмены');
+      const undoLabel = createWidgetElement('div', 'canvas-layout-section-label', t('settings.undoHistory'));
       container.appendChild(undoLabel);
 
       const undoInfo = createWidgetElement('div', 'canvas-layout-widget-note', '');
       container.appendChild(undoInfo);
 
       const undoLimitRow = createWidgetElement('div', 'canvas-layout-widget-field-row');
-      undoLimitRow.appendChild(createWidgetElement('span', 'canvas-layout-widget-field-label', 'Лимит'));
+      undoLimitRow.appendChild(createWidgetElement('span', 'canvas-layout-widget-field-label', t('settings.limit')));
       const undoLimitInput = createWidgetElement('input', 'canvas-layout-widget-number');
       undoLimitInput.type = 'number';
       undoLimitInput.min = '1';
@@ -2716,13 +2982,13 @@
 
       const undoActions = createWidgetElement('div', 'canvas-layout-widget-actions');
       const undoButton = createCanvasActionButton({
-        label: 'Отменить шаг',
-        caption: 'Вернуться на один шаг назад',
+        label: t('actions.undoStep'),
+        caption: t('settings.undoActionCaption'),
         onClick: undoLastAction
       });
       const clearUndoButton = createCanvasActionButton({
-        label: 'Очистить историю',
-        caption: 'Сбросить накопленные snapshot-и',
+        label: t('actions.clearHistory'),
+        caption: t('settings.clearHistoryCaption'),
         onClick: clearUndoHistory
       });
       undoActions.appendChild(undoButton);
@@ -2805,7 +3071,7 @@
       const part = getSelectedPart();
       if (!part || selectedJointId || areInspectorPanelsSuppressed()) {
         return {
-          empty: 'Деталь не выбрана'
+          empty: t('widgets.partEmpty')
         };
       }
 
@@ -2817,28 +3083,28 @@
       return {
         title: `${typeDef.label} #${part.id}`,
         lines: [
-          `Длина: ${part.typeId === 'profile-20x20' ? `${part.params.length} мм` : '—'}`,
+          `${t('selection.length')}: ${part.typeId === 'profile-20x20' ? formatMillimeters(part.params.length) : t('common.dash')}`,
           `X:${position[0].toFixed(0)} Y:${position[1].toFixed(0)} Z:${position[2].toFixed(0)}`,
-          `Соединения: ${jointCount}`,
-          `Подсборка: ${component.partIds.length}`
+          `${t('selection.connections')}: ${jointCount}`,
+          `${t('selection.subassembly')}: ${component.partIds.length}`
         ],
         actions: [
           {
-            label: 'Соединить',
-            caption: 'Выбрать порт',
+            label: t('actions.connect'),
+            caption: t('widgets.choosePortCaption'),
             tone: 'accent',
             disabled: !canConnectPart(part),
             onClick: beginConnectMode
           },
           {
-            label: 'Разъединить',
-            caption: 'Убрать связи',
+            label: t('actions.disconnect'),
+            caption: t('widgets.disconnectCaption'),
             disabled: jointCount === 0,
             onClick: disconnectSelectedPart
           },
           {
-            label: 'Удалить',
-            caption: 'Стереть деталь',
+            label: t('actions.delete'),
+            caption: t('widgets.deleteCaption'),
             onClick: deleteSelected
           }
         ]
@@ -2849,7 +3115,7 @@
       const joint = getSelectedJoint();
       if (!joint || areInspectorPanelsSuppressed()) {
         return {
-          empty: 'Связь не выбрана'
+          empty: t('widgets.jointEmpty')
         };
       }
 
@@ -2863,11 +3129,11 @@
         lines: [
           `${labelA} · ${joint.a.portId}`,
           `${labelB} · ${joint.b.portId}`,
-          `Правило: ${joint.ruleId}`
+          `${t('joint.rule')}: ${joint.ruleId}`
         ],
         actions: [
           {
-            label: 'Разорвать',
+            label: t('actions.split'),
             caption: 'Split joint',
             onClick: splitSelectedJoint
           }
@@ -2881,10 +3147,10 @@
         initialState: { length: profileLengthValue },
         render: function(container, state) {
           const card = createWidgetElement('section', 'canvas-layout-widget-surface');
-          card.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', 'Добавить'));
+          card.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', t('widgets.add')));
 
           const row = createWidgetElement('label', 'canvas-layout-widget-field-row');
-          row.appendChild(createWidgetElement('span', 'canvas-layout-widget-field-label', 'Длина'));
+          row.appendChild(createWidgetElement('span', 'canvas-layout-widget-field-label', t('legacy.fields.length')));
           const input = createWidgetElement('input', 'canvas-layout-widget-number');
           input.type = 'number';
           input.min = '40';
@@ -2892,26 +3158,26 @@
           input.step = '10';
           input.value = `${clampProfileLength(state && state.length)}`;
           row.appendChild(input);
-          row.appendChild(createWidgetElement('span', 'canvas-layout-widget-field-label', 'мм'));
+          row.appendChild(createWidgetElement('span', 'canvas-layout-widget-field-label', t('common.mm')));
           card.appendChild(row);
 
           const actions = createWidgetElement('div', 'canvas-layout-widget-actions');
           actions.appendChild(createCanvasActionButton({
-            label: 'Профиль',
-            caption: '20x20 profile',
+            label: t('actions.profile'),
+            caption: t('partTypes.profile20x20'),
             tone: 'accent',
             onClick: addProfile
           }));
           actions.appendChild(createCanvasActionButton({
-            label: 'Угол',
-            caption: 'connector-angle-20',
+            label: t('actions.angle'),
+            caption: t('partTypes.connectorAngle20'),
             onClick: function() {
               addConnector('connector-angle-20');
             }
           }));
           actions.appendChild(createCanvasActionButton({
-            label: 'Прямой',
-            caption: 'connector-straight-20',
+            label: t('actions.straight'),
+            caption: t('partTypes.connectorStraight20'),
             onClick: function() {
               addConnector('connector-straight-20');
             }
@@ -2937,9 +3203,9 @@
         initialState: buildSelectedPartWidgetState(),
         render: function(container, state) {
           const card = createWidgetElement('section', 'canvas-layout-widget-surface');
-          card.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', 'Деталь'));
+          card.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', t('widgets.part')));
           if (!state || state.empty) {
-            card.appendChild(createWidgetElement('div', 'canvas-layout-widget-empty', state && state.empty ? state.empty : 'Нет данных'));
+            card.appendChild(createWidgetElement('div', 'canvas-layout-widget-empty', state && state.empty ? state.empty : t('widgets.noData')));
             container.appendChild(card);
             return;
           }
@@ -2967,9 +3233,9 @@
         initialState: buildSelectedJointWidgetState(),
         render: function(container, state) {
           const card = createWidgetElement('section', 'canvas-layout-widget-surface');
-          card.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', 'Связь'));
+          card.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', t('widgets.joint')));
           if (!state || state.empty) {
-            card.appendChild(createWidgetElement('div', 'canvas-layout-widget-empty', state && state.empty ? state.empty : 'Нет данных'));
+            card.appendChild(createWidgetElement('div', 'canvas-layout-widget-empty', state && state.empty ? state.empty : t('widgets.noData')));
             container.appendChild(card);
             return;
           }
@@ -2996,15 +3262,15 @@
         widgetType: 'status',
         render: function(container) {
           const card = createWidgetElement('section', 'canvas-layout-widget-surface');
-          card.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', 'Подсказки'));
+          card.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', t('widgets.hints')));
           const lines = createWidgetElement('div', 'canvas-layout-widget-lines');
           [
-            'Гизмо: оси → перемещение, кольца → вращение, белые стрелки → длина',
-            'Клик по детали или связи → выноска',
-            'Потянуть деталь → drag без выноски',
-            'Соединить → выбрать порт, затем цель',
-            'Esc → снять выделение или отменить действие',
-            'ЛКМ пусто → орбита, ПКМ → панорама, колесо → зум'
+            t('hints.line1'),
+            t('hints.line2'),
+            t('hints.line3'),
+            t('hints.line4'),
+            t('hints.line5'),
+            t('hints.line6')
           ].forEach(function(line) {
             lines.appendChild(createWidgetElement('div', '', line));
           });
@@ -3023,8 +3289,8 @@
           surface.style.width = '100%';
           surface.style.alignSelf = 'flex-start';
           surface.style.height = 'auto';
-          surface.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', 'Отладка выбора цели'));
-          surface.appendChild(createWidgetElement('div', 'canvas-layout-widget-note', 'Диагностика вынесена в edge drawer, чтобы не занимать рабочие tabs. Настройки сгруппированы вертикально и растягиваются на всю ширину drawer.'));
+          surface.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', t('widgets.targetDebug')));
+          surface.appendChild(createWidgetElement('div', 'canvas-layout-widget-note', t('widgets.targetDebugNote')));
           container.appendChild(surface);
           return createPrototypeConnectDebugTab(surface);
         }
@@ -3037,8 +3303,8 @@
         initialState: { text: currentModeLabelText },
         render: function(container, state) {
           const chip = createWidgetElement('div', 'canvas-layout-status-chip');
-          chip.appendChild(createWidgetElement('span', 'canvas-layout-status-chip-label', 'Режим'));
-          chip.appendChild(createWidgetElement('span', 'canvas-layout-status-chip-value', (state && state.text) || '—'));
+          chip.appendChild(createWidgetElement('span', 'canvas-layout-status-chip-label', t('status.mode')));
+          chip.appendChild(createWidgetElement('span', 'canvas-layout-status-chip-value', (state && state.text) || t('common.dash')));
           container.appendChild(chip);
         }
       });
@@ -3055,8 +3321,8 @@
           } else {
             chip.classList.add('is-active');
           }
-          chip.appendChild(createWidgetElement('span', 'canvas-layout-status-chip-label', 'Snap'));
-          chip.appendChild(createWidgetElement('span', 'canvas-layout-status-chip-value', '⊕ ACTIVE'));
+          chip.appendChild(createWidgetElement('span', 'canvas-layout-status-chip-label', t('status.snap')));
+          chip.appendChild(createWidgetElement('span', 'canvas-layout-status-chip-value', t('status.snapActive')));
           container.appendChild(chip);
         }
       });
@@ -3104,6 +3370,127 @@
       reader.readAsText(file);
     }
 
+    function mountCanvasLayoutPrototype() {
+      if (canvasLayoutPrototype && typeof canvasLayoutPrototype.destroy === 'function') {
+        canvasLayoutPrototype.destroy();
+      }
+
+      canvasLayoutPrototype = createCanvasLayoutPrototype({
+        container: overlayManager.getLayerHost('panels'),
+        modalContainer: overlayManager.getLayerHost('modal'),
+        onExportProject: exportJson,
+        onImportProject: function() {
+          elements.importInput.click();
+        },
+        topRegionAnchorId: 'top-region',
+        edgeDrawers: [
+          {
+            id: 'left-edge-debug-drawer',
+            anchorId: 'top-region',
+            label: t('legacy.sections.debug'),
+            handleLabel: t('legacy.sections.debug'),
+            width: '340px',
+            handleSize: '30px',
+            visibleEdgeWidth: subtleDrawerHandle.visibleEdgeWidth,
+            hoverPeekWidth: subtleDrawerHandle.hoverPeekWidth,
+            open: false,
+            widget: connectDebugDrawerWidget
+          }
+        ],
+        topRightTabs: [
+          {
+            id: 'project',
+            label: t('project.tab'),
+            buttons: [
+              {
+                label: t('actions.exportJson'),
+                caption: t('project.exportCaption'),
+                tone: 'accent',
+                onClick: exportJson
+              },
+              {
+                label: t('actions.importJson'),
+                caption: t('project.importCaption'),
+                onClick: function() {
+                  elements.importInput.click();
+                }
+              }
+            ]
+          },
+          {
+            id: 'settings',
+            label: t('settings.tab'),
+            renderContent: createPrototypeSettingsTab
+          }
+        ],
+        leftTabs: [
+          {
+            id: 'add',
+            label: t('widgets.add'),
+            renderContent: mountPanelWidget(addPartWidget)
+          },
+          {
+            id: 'part',
+            label: t('widgets.part'),
+            renderContent: mountPanelWidget(selectedPartWidget)
+          },
+          {
+            id: 'joint',
+            label: t('widgets.joint'),
+            renderContent: mountPanelWidget(selectedJointWidget)
+          }
+        ],
+        iconRailItems: [
+          {
+            icon: '⌂',
+            label: t('actions.resetView'),
+            onClick: function() {
+              viewport.resetCamera();
+              refreshGizmo();
+              refreshCallouts();
+            }
+          },
+          {
+            icon: '↶',
+            label: t('actions.undoStep'),
+            getDisabled: function() {
+              return !canUndo() || pendingPick || activeInteraction || isOrbiting || isPanning || isConnectMode() || mode === 'postConnectAdjust';
+            },
+            onClick: function() {
+              undoLastAction();
+            }
+          }
+        ],
+        centerWidgets: [modeStatusWidget, snapStatusWidget, interactionStatusWidget],
+        rightBottomWidgets: [viewCube],
+        bottomTabs: [
+          {
+            id: 'help',
+            label: t('widgets.hints'),
+            renderContent: mountPanelWidget(hintWidget)
+          }
+        ],
+        renderSettingsTab: createPrototypeSettingsTab
+      });
+    }
+
+    function applyLocaleToUi() {
+      syncStaticUiText();
+      connectStrategyPanel.sync();
+      if (addPartWidget && selectedPartWidget && selectedJointWidget) {
+        mountCanvasLayoutPrototype();
+      }
+      updateConnectDebugUi();
+      updateSettingsUi();
+      updateSelectionInfo();
+      updateJointInfo();
+    }
+
+    syncStaticUiText();
+    if (i18n && typeof i18n.subscribe === 'function') {
+      i18n.subscribe(applyLocaleToUi);
+    }
+
     elements.addProfileButton.addEventListener('click', addProfile);
     elements.addAngleButton.addEventListener('click', function() {
       addConnector('connector-angle-20');
@@ -3116,6 +3503,9 @@
     elements.splitJointButton.addEventListener('click', splitSelectedJoint);
     elements.deleteButton.addEventListener('click', deleteSelected);
     elements.toggleAlignButton.addEventListener('click', toggleAlign);
+    if (elements.topbarLanguageSelect) {
+      elements.topbarLanguageSelect.addEventListener('change', handleLocaleSelectChange);
+    }
     registerConnectDebugUiBinding({
       button: elements.toggleConnectDebugButton,
       stateElement: elements.connectDebugState,
@@ -3140,109 +3530,7 @@
     const connectDebugDrawerWidget = createConnectDebugDrawerWidget();
     const subtleDrawerHandle = EDGE_DRAWER_PRESETS.subtleHandle;
 
-    canvasLayoutPrototype = createCanvasLayoutPrototype({
-      container: overlayManager.getLayerHost('panels'),
-      modalContainer: overlayManager.getLayerHost('modal'),
-      onExportProject: exportJson,
-      onImportProject: function() {
-        elements.importInput.click();
-      },
-      topRegionAnchorId: 'top-region',
-      edgeDrawers: [
-        {
-          id: 'left-edge-debug-drawer',
-          anchorId: 'top-region',
-          label: 'Отладка',
-          handleLabel: 'Debug',
-          width: '340px',
-          handleSize: '30px',
-          visibleEdgeWidth: subtleDrawerHandle.visibleEdgeWidth,
-          hoverPeekWidth: subtleDrawerHandle.hoverPeekWidth,
-          open: false,
-          widget: connectDebugDrawerWidget
-        }
-      ],
-      topRightTabs: [
-        {
-          id: 'project',
-          label: 'Проект',
-          buttons: [
-            {
-              label: 'Экспорт JSON',
-              caption: 'Сохранить состояние',
-              tone: 'accent',
-              onClick: exportJson
-            },
-            {
-              label: 'Импорт JSON',
-              caption: 'Загрузить файл',
-              onClick: function() {
-                elements.importInput.click();
-              }
-            }
-          ],
-          cards: [
-            {
-              title: 'Пакет проекта',
-              lines: ['экспорт сборки', 'импорт ранее сохранённого проекта', 'заготовка под share/readme flow']
-            }
-          ]
-        },
-        {
-          id: 'settings',
-          label: 'Настройки',
-          renderContent: createPrototypeSettingsTab
-        }
-      ],
-      leftTabs: [
-        {
-          id: 'add',
-          label: 'Добавить',
-          renderContent: mountPanelWidget(addPartWidget)
-        },
-        {
-          id: 'part',
-          label: 'Деталь',
-          renderContent: mountPanelWidget(selectedPartWidget)
-        },
-        {
-          id: 'joint',
-          label: 'Связь',
-          renderContent: mountPanelWidget(selectedJointWidget)
-        }
-      ],
-      iconRailItems: [
-        {
-          icon: '⌂',
-          label: 'Сбросить вид',
-          onClick: function() {
-            viewport.resetCamera();
-            refreshGizmo();
-            refreshCallouts();
-          }
-        },
-        {
-          icon: '↶',
-          label: 'Отменить шаг',
-          getDisabled: function() {
-            return !canUndo() || pendingPick || activeInteraction || isOrbiting || isPanning || isConnectMode() || mode === 'postConnectAdjust';
-          },
-          onClick: function() {
-            undoLastAction();
-          }
-        }
-      ],
-      centerWidgets: [modeStatusWidget, snapStatusWidget, interactionStatusWidget],
-      rightBottomWidgets: [viewCube],
-      bottomTabs: [
-        {
-          id: 'help',
-          label: 'Подсказки',
-          renderContent: mountPanelWidget(hintWidget)
-        }
-      ],
-      renderSettingsTab: createPrototypeSettingsTab
-    });
+    mountCanvasLayoutPrototype();
     elements.snapBadge.style.display = 'none';
     elements.dragHud.style.display = 'none';
     elements.modeLabel.style.display = 'none';

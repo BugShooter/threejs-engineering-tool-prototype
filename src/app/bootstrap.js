@@ -7,5 +7,6 @@
   tool.connect = tool.connect || {};
   tool.scene = tool.scene || {};
   tool.editor = tool.editor || {};
+  tool.i18n = tool.i18n || {};
   tool.math = tool.math || {};
 })();

@@ -4,7 +4,7 @@ A browser-based engineering tool prototype built as my first practical Three.js 
 
 It explores assembly-style interaction in the browser: creating parts, connecting compatible ports, adjusting transforms, and saving scene state.
 
-This prototype grew out of an on-site observation day where I got to observe the workflow of the Digital Services team at item Industrietechnik GmbH. It was loosely inspired by industrial web configuration tools such as the [item Engineering Tool](https://tools.item24.com/).
+This prototype grew out of an on-site observation day where I got to observe the workflow of the Digital Services team at item Industrietechnik GmbH. It was loosely inspired by industrial web configuration tools such as the [item Engineering Tool](https://tools.item24.com/DEen/tools/engineeringtool/).
 
 ## Features
 
