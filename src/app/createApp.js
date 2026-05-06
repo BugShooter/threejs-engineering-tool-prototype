@@ -5436,6 +5436,14 @@
         }
       }
 
+      if (event.key === 'Delete' && !event.altKey && !event.ctrlKey && !event.metaKey && !isEditableEventTarget(event.target)) {
+        if (mode === 'idle' && selectedPartId && !selectedJointId && !isHistoryNavigationBlocked()) {
+          deleteSelected();
+          event.preventDefault();
+        }
+        return;
+      }
+
       if (event.key !== 'Escape') {
         return;
       }
