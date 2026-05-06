@@ -172,6 +172,7 @@
 
     let selectedPartId = null;
     let selectedJointId = null;
+    let selectedStructureActive = false;
     let hoveredJointId = null;
     let previewedPartId = null;
     let previewedPartIds = new Set();
@@ -852,6 +853,32 @@
       };
     }
 
+    function screenRectFromRects(rects) {
+      const visibleRects = rects.filter(Boolean);
+      if (!visibleRects.length) {
+        return null;
+      }
+
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+
+      for (const rect of visibleRects) {
+        minX = Math.min(minX, rect.left);
+        minY = Math.min(minY, rect.top);
+        maxX = Math.max(maxX, rect.right);
+        maxY = Math.max(maxY, rect.bottom);
+      }
+
+      return {
+        left: minX,
+        top: minY,
+        right: maxX,
+        bottom: maxY
+      };
+    }
+
     function projectBoxToScreenRect(box) {
       if (!box || box.isEmpty()) {
         return null;
@@ -879,6 +906,17 @@
 
       const box = new THREE.Box3().setFromObject(group);
       return expandScreenRect(projectBoxToScreenRect(box), padding || 0);
+    }
+
+    function getPartsScreenRect(partIds, padding) {
+      if (!Array.isArray(partIds) || !partIds.length) {
+        return null;
+      }
+
+      const rect = screenRectFromRects(partIds.map(function(partId) {
+        return getPartScreenRect(partId, 0);
+      }));
+      return expandScreenRect(rect, padding || 0);
     }
 
     function getJointPortPair(joint) {
@@ -1038,6 +1076,108 @@
       return selectedPartId ? getPart(selectedPartId) : null;
     }
 
+    function getSelectedStructureComponent() {
+      if (!selectedStructureActive || selectedJointId) {
+        return null;
+      }
+
+      const part = getSelectedPart();
+      if (!part) {
+        return null;
+      }
+
+      const component = assembly.getConnectedComponent(part.id);
+      return component && component.parts && component.parts.length > 1 ? component : null;
+    }
+
+    function isSelectedStructureActive() {
+      return !!getSelectedStructureComponent();
+    }
+
+    function getSelectedStructurePartIds() {
+      const component = getSelectedStructureComponent();
+      return component ? component.partIds.slice() : [];
+    }
+
+    function getSelectedStructurePartIdSet() {
+      return new Set(getSelectedStructurePartIds());
+    }
+
+    function refreshPartViews(partIds) {
+      const uniquePartIds = Array.from(new Set((partIds || []).filter(Boolean)));
+      for (const partId of uniquePartIds) {
+        if (getPart(partId)) {
+          syncPartView(partId);
+        }
+      }
+    }
+
+    function setSelectedStructureState(nextActive) {
+      const previousPartIds = getSelectedStructurePartIds();
+      selectedStructureActive = !!nextActive;
+      const nextPartIds = getSelectedStructurePartIds();
+      refreshPartViews(previousPartIds.concat(nextPartIds));
+    }
+
+    function clearSelectedStructureState() {
+      setSelectedStructureState(false);
+    }
+
+    function selectConnectedStructure() {
+      const part = getSelectedPart();
+      if (!part || selectedJointId) {
+        return false;
+      }
+
+      const component = assembly.getConnectedComponent(part.id);
+      if (!component || !component.parts || component.parts.length < 2) {
+        return false;
+      }
+
+      setSelectedStructureState(true);
+      refreshCallouts();
+      updateSelectionInfo();
+      return true;
+    }
+
+    function getStructureAnchorWorld(component) {
+      if (!component || !component.parts || !component.parts.length) {
+        return null;
+      }
+
+      const bounds = new THREE.Box3();
+      let hasBounds = false;
+
+      for (const partId of component.partIds) {
+        const group = partViews.get(partId);
+        if (!group) {
+          continue;
+        }
+
+        const partBounds = new THREE.Box3().setFromObject(group);
+        if (partBounds.isEmpty()) {
+          continue;
+        }
+
+        if (!hasBounds) {
+          bounds.copy(partBounds);
+          hasBounds = true;
+        } else {
+          bounds.union(partBounds);
+        }
+      }
+
+      if (hasBounds) {
+        return bounds.getCenter(new THREE.Vector3());
+      }
+
+      const center = new THREE.Vector3();
+      for (const part of component.parts) {
+        center.add(getPartPositionVector(part));
+      }
+      return center.multiplyScalar(1 / component.parts.length);
+    }
+
     function getSelectedJoint() {
       return selectedJointId ? getJoint(selectedJointId) : null;
     }
@@ -1101,6 +1241,7 @@
     function clearTransientSelectionHighlights() {
       setPreviewedPart(null);
       setHoveredJoint(null);
+      clearSelectedStructureState();
     }
 
     function getTypeDef(part) {
@@ -1133,9 +1274,11 @@
         return;
       }
 
+      const selectedStructurePartIds = getSelectedStructurePartIdSet();
+
       const group = createPartVisualGroup(getTypeDef(part), part, {
         selected: selectedPartId === partId,
-        highlighted: selectedPartId !== partId && previewedPartIds.has(partId)
+        highlighted: selectedPartId !== partId && (previewedPartIds.has(partId) || selectedStructurePartIds.has(partId))
       });
       group.position.copy(getPartPositionVector(part));
       group.quaternion.copy(getPartQuaternion(part));
@@ -2669,6 +2812,58 @@
     }
 
     function buildPartCalloutState() {
+      const structureComponent = getSelectedStructureComponent();
+      if (structureComponent) {
+        const rootPart = getSelectedPart();
+        const typeDef = rootPart ? getTypeDef(rootPart) : null;
+
+        return {
+          getAnchorScreen: function() {
+            const rect = getPartsScreenRect(structureComponent.partIds, 0);
+            if (rect) {
+              return {
+                x: (rect.left + rect.right) * 0.5,
+                y: rect.top + Math.min(22, Math.max(8, (rect.bottom - rect.top) * 0.2)),
+                visible: true
+              };
+            }
+
+            const anchorWorld = getStructureAnchorWorld(structureComponent);
+            return anchorWorld ? worldToScreen(anchorWorld) : null;
+          },
+          getLineRect: function() {
+            return getPartsScreenRect(structureComponent.partIds, 0);
+          },
+          getAvoidRect: function() {
+            return getPartsScreenRect(structureComponent.partIds, 52);
+          },
+          title: `${t('selection.subassembly')} · ${structureComponent.partIds.length}`,
+          lines: [
+            rootPart && typeDef ? `${t('common.selected')}: ${typeDef.label} #${rootPart.id}` : `${t('common.selected')}: ${t('common.dash')}`,
+            `${t('catalog.parts')}: ${structureComponent.partIds.length}`,
+            `${t('selection.connections')}: ${structureComponent.joints.length}`
+          ],
+          actions: [
+            {
+              icon: '◌',
+              tooltip: t('callout.selectSinglePart'),
+              onClick: function() {
+                if (rootPart) {
+                  selectPart(rootPart.id);
+                  setModeLabel('SELECT');
+                }
+              }
+            },
+            {
+              icon: '✕',
+              tooltip: t('callout.deleteSelectedStructure'),
+              danger: true,
+              onClick: deleteSelectedStructure
+            }
+          ]
+        };
+      }
+
       const part = getSelectedPart();
       if (!part || selectedJointId) {
         return null;
@@ -2679,6 +2874,7 @@
       const effectiveMode = getEffectiveGizmoMode(part);
       const partId = part.id;
       const typeDef = getTypeDef(part);
+      const component = assembly.getConnectedComponent(part.id);
       const lines = [
         `${t('callout.position')}: ${part.transform.position[0].toFixed(0)}, ${part.transform.position[1].toFixed(0)}, ${part.transform.position[2].toFixed(0)}`,
         `${t('selection.connections')}: ${assembly.getJointCountForPart(part.id)}`
@@ -2734,6 +2930,16 @@
             active: effectiveMode === 'length',
             disabled: !canResize,
             onClick: function() { setGizmoMode('length'); }
+          },
+          {
+            icon: '◫',
+            tooltip: t('callout.selectConnectedStructure'),
+            disabled: component.partIds.length < 2,
+            onClick: function() {
+              if (selectConnectedStructure()) {
+                setModeLabel('SELECT');
+              }
+            }
           },
           {
             icon: '⇄',
@@ -3404,6 +3610,7 @@
       }
 
       beginCommittedHistoryChange();
+      clearSelectedStructureState();
 
       const joint = getSelectedJoint();
       if (joint && (joint.a.partId === part.id || joint.b.partId === part.id)) {
@@ -3481,6 +3688,7 @@
         return;
       }
       beginCommittedHistoryChange();
+      clearSelectedStructureState();
       removePartView(part.id);
       assembly.removePart(part.id);
       selectedPartId = null;
@@ -3489,6 +3697,29 @@
       updateSelectionInfo();
       updateJointInfo();
       refreshGizmo();
+    }
+
+    function deleteSelectedStructure() {
+      const component = getSelectedStructureComponent();
+      if (!component) {
+        return false;
+      }
+
+      beginCommittedHistoryChange();
+      for (const partId of component.partIds) {
+        removePartView(partId);
+        assembly.removePart(partId);
+      }
+
+      selectedPartId = null;
+      selectedJointId = null;
+      clearSelectedStructureState();
+      refreshSceneOverlays();
+      updateSelectionInfo();
+      updateJointInfo();
+      refreshGizmo();
+      refreshCallouts();
+      return true;
     }
 
     function toggleAlign() {
@@ -3790,6 +4021,7 @@
       const typeDef = getTypeDef(part);
       const position = part.transform.position;
       const jointCount = assembly.getJointCountForPart(part.id);
+      const structureSelected = isSelectedStructureActive();
 
       return {
         title: `${typeDef.label} #${part.id}`,
@@ -3808,6 +4040,13 @@
             onClick: beginConnectMode
           },
           {
+            label: t('actions.selectConnectedStructure'),
+            caption: t('widgets.selectStructureCaption'),
+            tone: structureSelected ? 'accent' : null,
+            disabled: component.partIds.length < 2,
+            onClick: selectConnectedStructure
+          },
+          {
             label: t('actions.disconnect'),
             caption: t('widgets.disconnectCaption'),
             disabled: jointCount === 0,
@@ -3818,13 +4057,20 @@
             caption: t('widgets.deleteCaption'),
             onClick: deleteSelected
           }
-        ]
+        ].concat(structureSelected ? [
+          {
+            label: t('actions.deleteStructure'),
+            caption: t('widgets.deleteStructureCaption'),
+            onClick: deleteSelectedStructure
+          }
+        ] : [])
       };
     }
 
     function buildStructureWidgetState() {
       const ungroupedItems = [];
       const groupedItems = new Map();
+      const structurePartIds = getSelectedStructurePartIdSet();
 
       function buildItem(part) {
         const typeDef = getTypeDef(part);
@@ -3832,7 +4078,7 @@
           id: part.id,
           label: `${typeDef ? typeDef.label : part.typeId} #${part.id}`,
           caption: `${t('selection.connections')}: ${assembly.getJointCountForPart(part.id)}`,
-          active: selectedPartId === part.id && !selectedJointId
+          active: !selectedJointId && (structurePartIds.has(part.id) || selectedPartId === part.id)
         };
       }
 
