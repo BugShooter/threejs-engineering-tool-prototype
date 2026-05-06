@@ -140,6 +140,8 @@
       renameCaption: 'Den Namen der gespeicherten Baugruppe aktualisieren',
       storageUnavailable: 'Der Browser-Speicher ist in dieser Sitzung nicht verfügbar.',
       modalNote: 'Pruefen Sie die Vorschau und passen Sie den Namen der Baugruppe vor dem Speichern in den Katalog an.',
+      manageTitle: 'Baugruppe',
+      manageModalNote: 'Pruefen Sie die Vorschau, benennen Sie die Baugruppe um oder entfernen Sie sie aus dem Katalog.',
       nameLabel: 'Name',
       defaultNameBase: 'Baugruppe',
       namePromptSelection: 'Name für die gespeicherte Unterbaugruppe:',

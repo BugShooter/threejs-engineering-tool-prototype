@@ -112,7 +112,7 @@
     widgets: {
       structure: 'Structure',
       catalog: 'Catalog',
-      savedAssemblies: 'Saved',
+      savedAssemblies: 'Assemblies',
       add: 'Add',
       part: 'Part',
       joint: 'Connection',
@@ -140,6 +140,8 @@
       renameCaption: 'Update the saved assembly name',
       storageUnavailable: 'Browser storage is unavailable in this session.',
       modalNote: 'Check the preview and adjust the assembly name before saving it to the catalog.',
+      manageTitle: 'Assembly',
+      manageModalNote: 'Review the preview, rename the assembly, or remove it from the catalog.',
       nameLabel: 'Name',
       defaultNameBase: 'Assembly',
       namePromptSelection: 'Name for the saved subassembly:',

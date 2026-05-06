@@ -254,7 +254,8 @@
     let savedAssembliesWidget = null;
     let savedAssemblyEntries = loadAssemblyCatalogEntries();
     let assemblyCatalogDraft = null;
-    let assemblyCatalogDraftModalCleanup = null;
+    let assemblyCatalogEditingEntry = null;
+    let assemblyCatalogModalCleanup = null;
 
     function t(key, replacements) {
       if (!i18n || !key) {
@@ -1259,6 +1260,7 @@
         return false;
       }
 
+      assemblyCatalogEditingEntry = null;
       assemblyCatalogDraft = {
         scope: snapshotConfig.scope,
         snapshot: snapshotConfig.snapshot,
@@ -1275,6 +1277,63 @@
     function cancelAssemblyCatalogEntryDraft() {
       assemblyCatalogDraft = null;
       refreshAssemblyCatalogWidget();
+    }
+
+    function openAssemblyCatalogEntryEditor(entryId) {
+      const entry = savedAssemblyEntries.find(function(candidate) {
+        return candidate.id === entryId;
+      });
+      if (!entry) {
+        return false;
+      }
+
+      assemblyCatalogDraft = null;
+      assemblyCatalogEditingEntry = {
+        id: entry.id,
+        name: entry.name
+      };
+      refreshAssemblyCatalogWidget();
+      return true;
+    }
+
+    function cancelAssemblyCatalogEntryEditor() {
+      assemblyCatalogEditingEntry = null;
+      refreshAssemblyCatalogWidget();
+    }
+
+    function saveAssemblyCatalogEntryEditor() {
+      if (!assemblyCatalogEditingEntry) {
+        return false;
+      }
+
+      const trimmedName = String(assemblyCatalogEditingEntry.name || '').trim();
+      if (!trimmedName) {
+        return false;
+      }
+
+      const previousEditor = assemblyCatalogEditingEntry;
+      assemblyCatalogEditingEntry = null;
+      const didRename = renameAssemblyCatalogEntry(previousEditor.id, trimmedName);
+      if (!didRename) {
+        assemblyCatalogEditingEntry = previousEditor;
+        refreshAssemblyCatalogWidget();
+      }
+      return didRename;
+    }
+
+    function removeAssemblyCatalogEntryFromEditor() {
+      if (!assemblyCatalogEditingEntry) {
+        return false;
+      }
+
+      const previousEditor = assemblyCatalogEditingEntry;
+      assemblyCatalogEditingEntry = null;
+      const didRemove = removeAssemblyCatalogEntry(previousEditor.id);
+      if (!didRemove) {
+        assemblyCatalogEditingEntry = previousEditor;
+        refreshAssemblyCatalogWidget();
+      }
+      return didRemove;
     }
 
     function saveAssemblyCatalogDraft() {
@@ -3849,17 +3908,27 @@
       };
     }
 
-    function closeAssemblyCatalogDraftModal() {
-      if (typeof assemblyCatalogDraftModalCleanup === 'function') {
-        assemblyCatalogDraftModalCleanup();
+    function closeAssemblyCatalogModal() {
+      if (typeof assemblyCatalogModalCleanup === 'function') {
+        assemblyCatalogModalCleanup();
       }
-      assemblyCatalogDraftModalCleanup = null;
+      assemblyCatalogModalCleanup = null;
     }
 
-    function refreshAssemblyCatalogDraftModal() {
-      closeAssemblyCatalogDraftModal();
+    function getAssemblyCatalogEditingEntryRecord() {
+      if (!assemblyCatalogEditingEntry) {
+        return null;
+      }
 
-      if (!assemblyCatalogDraft || !overlayManager || typeof overlayManager.getLayerHost !== 'function') {
+      return savedAssemblyEntries.find(function(entry) {
+        return entry.id === assemblyCatalogEditingEntry.id;
+      }) || null;
+    }
+
+    function openAssemblyCatalogModal(config) {
+      closeAssemblyCatalogModal();
+
+      if (!config || !overlayManager || typeof overlayManager.getLayerHost !== 'function') {
         return;
       }
 
@@ -3871,24 +3940,24 @@
       const cleanups = [];
       const backdrop = createWidgetElement('div', 'canvas-layout-catalog-modal-backdrop');
       const dialog = createWidgetElement('section', 'canvas-layout-widget-surface canvas-layout-catalog-modal');
-      dialog.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', t('catalog.editorTitle')));
-      dialog.appendChild(createWidgetElement('div', 'canvas-layout-widget-note', t('catalog.modalNote')));
+      dialog.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', config.title || t('catalog.editorTitle')));
+      dialog.appendChild(createWidgetElement('div', 'canvas-layout-widget-note', config.note || t('catalog.modalNote')));
 
       const previewImage = document.createElement('img');
       previewImage.className = 'canvas-layout-catalog-modal-preview';
-      previewImage.src = assemblyCatalogDraft.thumbnailDataUrl || buildAssemblyCatalogPreviewDataUrl({
-        name: assemblyCatalogDraft.name,
-        scope: assemblyCatalogDraft.scope,
-        partCount: assemblyCatalogDraft.partCount,
-        jointCount: assemblyCatalogDraft.jointCount
+      previewImage.src = config.previewUrl || buildAssemblyCatalogPreviewDataUrl({
+        name: config.name,
+        scope: config.scope,
+        partCount: config.partCount,
+        jointCount: config.jointCount
       });
-      previewImage.alt = assemblyCatalogDraft.name || assemblyCatalogDraft.defaultName || t('catalog.unnamed');
+      previewImage.alt = config.name || t('catalog.unnamed');
       dialog.appendChild(previewImage);
 
       const lines = createWidgetElement('div', 'canvas-layout-tab-lines');
-      lines.appendChild(createWidgetElement('div', '', `${t('catalog.scopeLabel')}: ${getAssemblyCatalogScopeLabel(assemblyCatalogDraft.scope)}`));
-      lines.appendChild(createWidgetElement('div', '', `${t('catalog.parts')}: ${assemblyCatalogDraft.partCount}`));
-      lines.appendChild(createWidgetElement('div', '', `${t('selection.connections')}: ${assemblyCatalogDraft.jointCount}`));
+      lines.appendChild(createWidgetElement('div', '', `${t('catalog.scopeLabel')}: ${getAssemblyCatalogScopeLabel(config.scope)}`));
+      lines.appendChild(createWidgetElement('div', '', `${t('catalog.parts')}: ${config.partCount}`));
+      lines.appendChild(createWidgetElement('div', '', `${t('selection.connections')}: ${config.jointCount}`));
       dialog.appendChild(lines);
 
       const nameRow = createWidgetElement('label', 'canvas-layout-widget-field-row');
@@ -3896,7 +3965,7 @@
       nameRow.appendChild(createWidgetElement('span', 'canvas-layout-widget-field-label', t('catalog.nameLabel')));
       const nameInput = createWidgetElement('input', 'canvas-layout-widget-number');
       nameInput.type = 'text';
-      nameInput.value = assemblyCatalogDraft.name || '';
+      nameInput.value = config.name || '';
       nameInput.style.width = '100%';
       nameInput.style.flex = '1 1 auto';
       nameRow.appendChild(nameInput);
@@ -3904,18 +3973,27 @@
 
       const actions = createWidgetElement('div', 'canvas-layout-widget-actions');
       actions.appendChild(createCanvasActionButton({
-        label: t('actions.done'),
-        caption: t('catalog.confirmCaption'),
-        tone: 'success',
+        label: config.confirmLabel || t('actions.done'),
+        caption: config.confirmCaption || t('catalog.confirmCaption'),
+        tone: config.confirmTone || 'success',
         onClick: function() {
-          saveAssemblyCatalogDraft();
+          config.onConfirm();
         }
       }));
+      if (config.secondaryAction) {
+        actions.appendChild(createCanvasActionButton({
+          label: config.secondaryAction.label,
+          caption: config.secondaryAction.caption,
+          onClick: function() {
+            config.secondaryAction.onClick();
+          }
+        }));
+      }
       actions.appendChild(createCanvasActionButton({
         label: t('actions.cancel'),
         caption: t('catalog.cancelCaption'),
         onClick: function() {
-          cancelAssemblyCatalogEntryDraft();
+          config.onCancel();
         }
       }));
       dialog.appendChild(actions);
@@ -3924,27 +4002,24 @@
       modalHost.appendChild(backdrop);
 
       function syncDraftName() {
-        if (!assemblyCatalogDraft) {
-          return;
-        }
-        assemblyCatalogDraft.name = nameInput.value;
+        config.onNameChange(nameInput.value);
       }
 
       function handleNameKeydown(event) {
         if (event.key === 'Enter') {
           event.preventDefault();
-          saveAssemblyCatalogDraft();
+          config.onConfirm();
           return;
         }
         if (event.key === 'Escape') {
           event.preventDefault();
-          cancelAssemblyCatalogEntryDraft();
+          config.onCancel();
         }
       }
 
       function handleBackdropClick(event) {
         if (event.target === backdrop) {
-          cancelAssemblyCatalogEntryDraft();
+          config.onCancel();
         }
       }
 
@@ -3962,13 +4037,66 @@
         nameInput.select();
       });
 
-      assemblyCatalogDraftModalCleanup = function() {
+      assemblyCatalogModalCleanup = function() {
         while (cleanups.length) {
           const cleanup = cleanups.pop();
           cleanup();
         }
         backdrop.remove();
       };
+    }
+
+    function refreshAssemblyCatalogModal() {
+      const editingEntry = getAssemblyCatalogEditingEntryRecord();
+
+      if (assemblyCatalogDraft) {
+        openAssemblyCatalogModal({
+          title: t('catalog.editorTitle'),
+          note: t('catalog.modalNote'),
+          previewUrl: assemblyCatalogDraft.thumbnailDataUrl,
+          name: assemblyCatalogDraft.name || assemblyCatalogDraft.defaultName,
+          scope: assemblyCatalogDraft.scope,
+          partCount: assemblyCatalogDraft.partCount,
+          jointCount: assemblyCatalogDraft.jointCount,
+          onNameChange: function(nextName) {
+            if (assemblyCatalogDraft) {
+              assemblyCatalogDraft.name = nextName;
+            }
+          },
+          onConfirm: saveAssemblyCatalogDraft,
+          onCancel: cancelAssemblyCatalogEntryDraft
+        });
+        return;
+      }
+
+      if (assemblyCatalogEditingEntry && editingEntry) {
+        openAssemblyCatalogModal({
+          title: t('catalog.manageTitle'),
+          note: t('catalog.manageModalNote'),
+          previewUrl: editingEntry.thumbnailDataUrl || buildAssemblyCatalogPreviewDataUrl(editingEntry),
+          name: assemblyCatalogEditingEntry.name,
+          scope: editingEntry.scope,
+          partCount: editingEntry.partCount,
+          jointCount: editingEntry.jointCount,
+          confirmLabel: t('actions.renameCatalogEntry'),
+          confirmCaption: t('catalog.renameCaption'),
+          onNameChange: function(nextName) {
+            if (assemblyCatalogEditingEntry) {
+              assemblyCatalogEditingEntry.name = nextName;
+            }
+          },
+          onConfirm: saveAssemblyCatalogEntryEditor,
+          onCancel: cancelAssemblyCatalogEntryEditor,
+          secondaryAction: {
+            label: t('actions.removeFromCatalog'),
+            caption: t('catalog.removeCaption'),
+            onClick: removeAssemblyCatalogEntryFromEditor
+          }
+        });
+        return;
+      }
+
+      closeAssemblyCatalogModal();
     }
 
     function refreshAssemblyCatalogWidget() {
@@ -3978,7 +4106,7 @@
       if (savedAssembliesWidget) {
         savedAssembliesWidget.update(buildSavedAssembliesWidgetState());
       }
-      refreshAssemblyCatalogDraftModal();
+      refreshAssemblyCatalogModal();
     }
 
     function buildSelectedJointWidgetState() {
@@ -4337,7 +4465,6 @@
         widgetType: 'saved-assemblies',
         initialState: buildSavedAssembliesWidgetState(),
         render: function(container, state) {
-          const cleanups = [];
           container.style.width = '100%';
           container.style.alignItems = 'stretch';
 
@@ -4376,19 +4503,14 @@
             const list = createWidgetElement('div', 'canvas-layout-widget-lines');
             list.style.gap = '8px';
             for (const item of state.items) {
-              const card = createWidgetElement('section', 'canvas-layout-tab-card');
+              const card = createWidgetElement('button', 'canvas-layout-tab-card');
+              card.type = 'button';
               card.style.width = '100%';
+              card.style.textAlign = 'left';
+              card.style.cursor = 'pointer';
+              card.setAttribute('aria-label', item.name);
 
-              const nameRow = createWidgetElement('label', 'canvas-layout-widget-field-row');
-              nameRow.style.alignItems = 'center';
-              nameRow.appendChild(createWidgetElement('span', 'canvas-layout-widget-field-label', t('catalog.nameLabel')));
-              const nameInput = createWidgetElement('input', 'canvas-layout-widget-number');
-              nameInput.type = 'text';
-              nameInput.value = item.name;
-              nameInput.style.width = '100%';
-              nameInput.style.flex = '1 1 auto';
-              nameRow.appendChild(nameInput);
-              card.appendChild(nameRow);
+              card.appendChild(createWidgetElement('div', 'canvas-layout-tab-card-title', item.name));
 
               const lines = createWidgetElement('div', 'canvas-layout-tab-lines');
               lines.appendChild(createWidgetElement('div', '', `${t('catalog.scopeLabel')}: ${getAssemblyCatalogScopeLabel(item.scope)}`));
@@ -4396,33 +4518,14 @@
               lines.appendChild(createWidgetElement('div', '', `${t('selection.connections')}: ${item.jointCount}`));
               card.appendChild(lines);
 
-              const row = createWidgetElement('div', 'canvas-layout-widget-actions');
-              row.appendChild(createCanvasActionButton({
-                label: t('actions.renameCatalogEntry'),
-                caption: t('catalog.renameCaption'),
-                onClick: function() {
-                  renameAssemblyCatalogEntry(item.id, nameInput.value);
-                }
-              }));
-              row.appendChild(createCanvasActionButton({
-                label: t('actions.removeFromCatalog'),
-                caption: t('catalog.removeCaption'),
-                onClick: function() {
-                  removeAssemblyCatalogEntry(item.id);
-                }
-              }));
-              card.appendChild(row);
+              card.addEventListener('click', function(event) {
+                event.preventDefault();
+                openAssemblyCatalogEntryEditor(item.id);
+              });
               list.appendChild(card);
             }
             container.appendChild(list);
           }
-
-          return function() {
-            while (cleanups.length) {
-              const cleanup = cleanups.pop();
-              cleanup();
-            }
-          };
         }
       });
     }
