@@ -98,7 +98,7 @@
       '.canvas-layout-tab-panel.is-slot-constrained .canvas-layout-tab-shell{max-height:100%;}',
       '.canvas-layout-tab-panel.is-fill-height .canvas-layout-tab-shell{height:100%;}',
       '.canvas-layout-tab-strip{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 8px 6px 8px;min-width:0;}',
-      '.canvas-layout-tab-list-viewport{display:flex;flex:1 1 auto;min-width:0;overflow:hidden;}',
+      '.canvas-layout-tab-list-viewport{display:flex;flex:1 1 auto;min-width:0;min-height:0;overflow:hidden;}',
       '.canvas-layout-tab-list{display:flex;flex:1 1 auto;gap:6px;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none;scroll-behavior:smooth;}',
       '.canvas-layout-tab-list::-webkit-scrollbar{display:none;}',
       '.canvas-layout-tab-actions{display:flex;flex:0 0 auto;gap:4px;}',
@@ -118,10 +118,12 @@
       '.canvas-layout-tab-panel.is-collapsed .canvas-layout-tab-actions{display:none;}',
       '.canvas-layout-tab-panel.is-collapsed .canvas-layout-tab-button{border:none;border-right:1px solid #324264;border-radius:0;min-height:24px;padding:5px 8px;background:rgba(23,30,44,.94);}',
       '.canvas-layout-tab-panel.is-collapsed .canvas-layout-tab-button:last-child{border-right:none;}',
-      '.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-list{flex-direction:column;align-self:flex-start;}',
+      '.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-list{flex-direction:column;align-self:flex-start;overflow:visible;max-height:none;}',
       '.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed{width:max-content;}',
-      '.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-shell,.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-strip{width:max-content;}',
-      '.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-button{writing-mode:vertical-rl;text-orientation:mixed;justify-content:center;border-right:none;border-bottom:1px solid #324264;min-width:30px;min-height:84px;padding:7px 4px;white-space:normal;}',
+      '.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-shell{width:max-content;height:100%;}',
+      '.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-strip{width:max-content;height:100%;flex-direction:column;align-items:stretch;}',
+      '.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-list-viewport{max-height:100%;overflow-y:auto;overflow-x:hidden;}',
+      '.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-button{flex:0 0 auto;writing-mode:vertical-rl;text-orientation:mixed;justify-content:center;border-right:none;border-bottom:1px solid #324264;min-width:30px;min-height:84px;padding:7px 4px;white-space:normal;}',
       '.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-button:last-child{border-bottom:none;}',
       '.canvas-layout-tab-content{display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0;padding:0 8px 7px 8px;overflow:auto;}',
       '.canvas-layout-tab-content,.canvas-layout-drawer-body,.canvas-layout-edge-drawer-body{scrollbar-width:thin;scrollbar-color:#78aefc rgba(10,14,22,.92);}',
@@ -185,7 +187,7 @@
       '.canvas-layout-edge-drawer-handle{position:absolute;top:-1px;right:-1px;bottom:-1px;width:var(--drawer-handle-size,32px);display:flex;align-items:center;justify-content:center;padding:10px 4px;border:1px solid #324264;border-left:none;border-radius:0 10px 10px 0;background:rgba(20,27,40,.98);color:#dce6ff;font-family:"JetBrains Mono",monospace;font-size:8px;letter-spacing:.08em;text-transform:uppercase;writing-mode:vertical-rl;text-orientation:mixed;cursor:pointer;transition:border-color .12s,background .12s,transform .12s,opacity .12s;pointer-events:auto;opacity:.96;}',
       '.canvas-layout-edge-drawer-handle:hover{border-color:#67a6ff;background:rgba(29,38,55,.98);}',
       '@media (max-width: 1180px){.canvas-layout-prototype,.canvas-layout-prototype-modal-host{--canvas-layout-system-inset:14px;}.canvas-layout-flow[data-layout-id="top-row"]{padding-right:0 !important;}.canvas-layout-tab-panel[data-dock="left"]:not(.is-collapsed){min-width:300px;}.canvas-layout-tab-panel[data-dock="left"] .canvas-layout-tab-content{min-width:240px;}.canvas-layout-button{min-width:104px;}}',
-      '@media (max-width: 900px){.canvas-layout-prototype,.canvas-layout-prototype-modal-host{--canvas-layout-system-inset:12px;}.canvas-layout-prototype-stage{overflow:auto;}.canvas-layout-flow.is-horizontal>.canvas-layout-slot{flex:0 0 auto !important;}.canvas-layout-flow.is-horizontal{flex-direction:column;}.canvas-layout-flow[data-layout-id="left-panel-row"],.canvas-layout-flow[data-layout-id="left-icon-rail-row"]{flex-direction:row !important;}.canvas-layout-slot{justify-items:stretch !important;}.canvas-layout-card,.canvas-layout-tab-panel[data-dock="left"] .canvas-layout-tab-content{max-width:none;}.canvas-layout-tab-panel[data-dock="left"]:not(.is-collapsed){min-width:300px;}.canvas-layout-tab-panel[data-dock="bottom"] .canvas-layout-tab-content{min-height:96px;}.canvas-layout-tab-panel.is-fill-height,.canvas-layout-tab-panel.is-fill-height .canvas-layout-tab-shell{height:auto;}.canvas-layout-tab-panel.is-fill-height .canvas-layout-tab-content{flex:0 0 auto;}.canvas-layout-tab-panel.is-collapsed .canvas-layout-tab-list{flex-wrap:wrap;}}'
+      '@media (max-width: 900px){.canvas-layout-prototype,.canvas-layout-prototype-modal-host{--canvas-layout-system-inset:12px;}.canvas-layout-prototype-stage{overflow:auto;}.canvas-layout-flow.is-horizontal>.canvas-layout-slot{flex:0 0 auto !important;}.canvas-layout-flow.is-horizontal{flex-direction:column;}.canvas-layout-flow[data-layout-id="left-panel-row"],.canvas-layout-flow[data-layout-id="left-icon-rail-row"]{flex-direction:row !important;}.canvas-layout-slot{justify-items:stretch !important;}.canvas-layout-card,.canvas-layout-tab-panel[data-dock="left"] .canvas-layout-tab-content{max-width:none;}.canvas-layout-tab-panel[data-dock="left"]:not(.is-collapsed){min-width:300px;}.canvas-layout-tab-panel[data-dock="bottom"] .canvas-layout-tab-content{min-height:96px;}.canvas-layout-tab-panel.is-fill-height,.canvas-layout-tab-panel.is-fill-height .canvas-layout-tab-shell{height:auto;}.canvas-layout-tab-panel.is-fill-height .canvas-layout-tab-content{flex:0 0 auto;}.canvas-layout-tab-panel.is-collapsed .canvas-layout-tab-list{flex-wrap:wrap;}.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-list{flex-wrap:nowrap;}}'
     ].join('');
     document.head.appendChild(style);
   }
@@ -845,12 +847,60 @@
     };
     let activeContentCleanup = null;
 
+    function useCollapsedVerticalTabs() {
+      return config.collapseMode === 'vertical-tabs' && state.collapsed;
+    }
+
+    function getLayoutSystemInset() {
+      const layoutRoot = mount.closest('.canvas-layout-prototype, .canvas-layout-prototype-modal-host');
+      if (!layoutRoot) {
+        return 0;
+      }
+
+      const rawInset = getComputedStyle(layoutRoot).getPropertyValue('--canvas-layout-system-inset');
+      const parsedInset = parseFloat(rawInset);
+      return Number.isFinite(parsedInset) ? parsedInset : 0;
+    }
+
+    function getCollapsedVerticalAvailableHeight() {
+      if (!mount.isConnected) {
+        return null;
+      }
+
+      const mountRect = mount.getBoundingClientRect();
+      const availableHeight = Math.floor(window.innerHeight - mountRect.top - getLayoutSystemInset());
+      return Math.max(96, availableHeight);
+    }
+
     function getTabScrollStep() {
-      return Math.max(96, Math.round(tabListViewport.clientWidth * 0.72));
+      const scrollContainer = useCollapsedVerticalTabs() ? tabListViewport : tabList;
+      const axisSize = useCollapsedVerticalTabs() ? scrollContainer.clientHeight : scrollContainer.clientWidth;
+      return Math.max(96, Math.round(axisSize * 0.72));
+    }
+
+    function getTabScrollContainer() {
+      return useCollapsedVerticalTabs() ? tabListViewport : tabList;
+    }
+
+    function syncTabScrollAxis() {
+      const vertical = useCollapsedVerticalTabs();
+      scrollPrevButton.textContent = vertical ? '↑' : '←';
+      scrollNextButton.textContent = vertical ? '↓' : '→';
+      scrollPrevButton.title = vertical ? t('actions.previous', 'Previous') : t('actions.previous', 'Previous');
+      scrollNextButton.title = vertical ? t('actions.next', 'Next') : t('actions.next', 'Next');
+      scrollPrevButton.setAttribute('aria-label', scrollPrevButton.title);
+      scrollNextButton.setAttribute('aria-label', scrollNextButton.title);
     }
 
     function syncTabScrollButtons() {
-      const needsScrollButtons = !state.collapsed && tabList.scrollWidth > tabList.clientWidth + 1;
+      const vertical = useCollapsedVerticalTabs();
+      const scrollContainer = getTabScrollContainer();
+      const supportsScrollButtons = vertical || !state.collapsed;
+      const needsScrollButtons = supportsScrollButtons && (vertical
+        ? scrollContainer.scrollHeight > scrollContainer.clientHeight + 1
+        : scrollContainer.scrollWidth > scrollContainer.clientWidth + 1);
+
+      syncTabScrollAxis();
       scrollPrevButton.classList.toggle('is-hidden', !needsScrollButtons);
       scrollNextButton.classList.toggle('is-hidden', !needsScrollButtons);
 
@@ -860,25 +910,58 @@
         return;
       }
 
-      const atStart = tabList.scrollLeft <= 1;
-      const atEnd = tabList.scrollLeft + tabList.clientWidth >= tabList.scrollWidth - 1;
+      const atStart = vertical ? scrollContainer.scrollTop <= 1 : scrollContainer.scrollLeft <= 1;
+      const atEnd = vertical
+        ? scrollContainer.scrollTop + scrollContainer.clientHeight >= scrollContainer.scrollHeight - 1
+        : scrollContainer.scrollLeft + scrollContainer.clientWidth >= scrollContainer.scrollWidth - 1;
       scrollPrevButton.setAttribute('aria-disabled', atStart ? 'true' : 'false');
       scrollNextButton.setAttribute('aria-disabled', atEnd ? 'true' : 'false');
     }
 
     function scrollTabList(direction) {
-      tabList.scrollBy({
-        left: getTabScrollStep() * direction,
-        behavior: 'smooth'
-      });
+      const scrollContainer = getTabScrollContainer();
+      const distance = getTabScrollStep() * direction;
+      scrollContainer.scrollBy(useCollapsedVerticalTabs()
+        ? {
+            top: distance,
+            behavior: 'smooth'
+          }
+        : {
+            left: distance,
+            behavior: 'smooth'
+          });
+    }
+
+    function handleTabListWheel(event) {
+      const vertical = useCollapsedVerticalTabs();
+      const scrollContainer = getTabScrollContainer();
+      const primaryDelta = vertical
+        ? (Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX)
+        : (Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY);
+
+      if (!primaryDelta) {
+        return;
+      }
+
+      const canScroll = vertical
+        ? scrollContainer.scrollHeight > scrollContainer.clientHeight + 1
+        : scrollContainer.scrollWidth > scrollContainer.clientWidth + 1;
+      if (!canScroll) {
+        return;
+      }
+
+      event.preventDefault();
+      scrollContainer.scrollBy(vertical ? { top: primaryDelta } : { left: primaryDelta });
     }
 
     function syncMountSizing() {
-      const useCollapsedVerticalTabs = config.collapseMode === 'vertical-tabs' && state.collapsed;
-      if (useCollapsedVerticalTabs) {
+      if (useCollapsedVerticalTabs()) {
+        const availableHeight = (config.constrainHeightToSlot || config.fillHeight)
+          ? getCollapsedVerticalAvailableHeight()
+          : null;
         mount.style.width = 'max-content';
-        mount.style.height = 'max-content';
-        mount.style.maxHeight = '';
+        mount.style.height = availableHeight ? `${availableHeight}px` : 'max-content';
+        mount.style.maxHeight = availableHeight ? `${availableHeight}px` : '';
         mount.style.flex = '0 0 auto';
         return;
       }
@@ -914,10 +997,16 @@
       exitFullscreen();
     }
 
+    function handleWindowResize() {
+      requestAnimationFrame(render);
+    }
+
     document.addEventListener('keydown', handleDocumentKeyDown);
+    window.addEventListener('resize', handleWindowResize);
     if (environment.cleanups) {
       environment.cleanups.push(function() {
         document.removeEventListener('keydown', handleDocumentKeyDown);
+        window.removeEventListener('resize', handleWindowResize);
         if (activeContentCleanup) {
           activeContentCleanup();
           activeContentCleanup = null;
@@ -930,6 +1019,8 @@
     }
 
     tabList.addEventListener('scroll', syncTabScrollButtons);
+    tabListViewport.addEventListener('scroll', syncTabScrollButtons);
+    strip.addEventListener('wheel', handleTabListWheel, { passive: false });
     scrollPrevButton.addEventListener('click', function(event) {
       event.preventDefault();
       if (scrollPrevButton.getAttribute('aria-disabled') === 'true') {
@@ -960,6 +1051,8 @@
     if (environment.cleanups) {
       environment.cleanups.push(function() {
         tabList.removeEventListener('scroll', syncTabScrollButtons);
+        tabListViewport.removeEventListener('scroll', syncTabScrollButtons);
+        strip.removeEventListener('wheel', handleTabListWheel, { passive: false });
       });
     }
 
@@ -1069,8 +1162,12 @@
         tabList.appendChild(button);
       });
       const activeButton = tabList.querySelector('.canvas-layout-tab-button.is-active');
-      if (activeButton && typeof activeButton.scrollIntoView === 'function' && !state.collapsed) {
-        activeButton.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      if (activeButton && typeof activeButton.scrollIntoView === 'function') {
+        if (useCollapsedVerticalTabs()) {
+          activeButton.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        } else if (!state.collapsed) {
+          activeButton.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
       }
     }
 
@@ -1099,10 +1196,11 @@
     }
 
     function render() {
+      const collapsedVerticalTabs = useCollapsedVerticalTabs();
       syncMountSizing();
       panel.classList.toggle('is-collapsed', state.collapsed);
       panel.classList.toggle('is-fill-height', !!config.fillHeight && !state.collapsed);
-      panel.classList.toggle('is-slot-constrained', !!config.constrainHeightToSlot && !state.collapsed && !state.fullscreen);
+      panel.classList.toggle('is-slot-constrained', !!config.constrainHeightToSlot && !state.fullscreen && (!state.collapsed || collapsedVerticalTabs));
       panel.classList.toggle('is-fullscreen', state.fullscreen);
       renderTabs();
       renderActions();
@@ -1111,6 +1209,11 @@
     }
 
     render();
+    requestAnimationFrame(function() {
+      if (mount.isConnected) {
+        render();
+      }
+    });
     return mount;
   }
 
