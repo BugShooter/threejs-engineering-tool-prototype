@@ -241,6 +241,7 @@
     let snapBadgeActive = false;
     let interactionHudMarkup = '';
     let addPartWidget = null;
+    let structureWidget = null;
     let selectedPartWidget = null;
     let selectedJointWidget = null;
     let snapStatusWidget = null;
@@ -2325,6 +2326,9 @@
         elements.selectionPanel.style.display = 'none';
         elements.connectButton.disabled = true;
         elements.selectionInfo.innerHTML = '—';
+        if (structureWidget) {
+          structureWidget.update(buildStructureWidgetState());
+        }
         if (selectedPartWidget) {
           selectedPartWidget.update(buildSelectedPartWidgetState());
         }
@@ -2347,6 +2351,9 @@
         `X:${position[0].toFixed(0)} Y:${position[1].toFixed(0)} Z:${position[2].toFixed(0)}<br>` +
         `${t('selection.connections')}: <span class="hi">${jointCount}</span><br>` +
         `${t('selection.subassembly')}: <span class="hi">${component.partIds.length}</span>`;
+      if (structureWidget) {
+        structureWidget.update(buildStructureWidgetState());
+      }
       if (selectedPartWidget) {
         selectedPartWidget.update(buildSelectedPartWidgetState());
       }
@@ -2358,6 +2365,9 @@
       if (!joint || areInspectorPanelsSuppressed()) {
         elements.jointPanel.style.display = 'none';
         elements.jointInfo.innerHTML = '—';
+        if (structureWidget) {
+          structureWidget.update(buildStructureWidgetState());
+        }
         if (selectedJointWidget) {
           selectedJointWidget.update(buildSelectedJointWidgetState());
         }
@@ -2376,6 +2386,9 @@
         `${labelA} · ${joint.a.portId}<br>` +
         `${labelB} · ${joint.b.portId}<br>` +
         `${t('joint.rule')}: <span class="hi">${joint.ruleId}</span>`;
+      if (structureWidget) {
+        structureWidget.update(buildStructureWidgetState());
+      }
       if (selectedJointWidget) {
         selectedJointWidget.update(buildSelectedJointWidgetState());
       }
@@ -3200,6 +3213,20 @@
       };
     }
 
+    function buildStructureWidgetState() {
+      return {
+        items: assembly.getParts().map(function(part) {
+          const typeDef = getTypeDef(part);
+          return {
+            id: part.id,
+            label: `${typeDef ? typeDef.label : part.typeId} #${part.id}`,
+            caption: `${t('selection.connections')}: ${assembly.getJointCountForPart(part.id)}`,
+            active: selectedPartId === part.id && !selectedJointId
+          };
+        })
+      };
+    }
+
     function buildSelectedJointWidgetState() {
       const joint = getSelectedJoint();
       if (!joint || areInspectorPanelsSuppressed()) {
@@ -3281,6 +3308,76 @@
           input.addEventListener('input', handleInput);
           return function() {
             input.removeEventListener('input', handleInput);
+          };
+        }
+      });
+    }
+
+    function createStructureWidget() {
+      return createDomWidget({
+        widgetType: 'inspector',
+        initialState: buildStructureWidgetState(),
+        render: function(container, state) {
+          const cleanups = [];
+          container.style.width = '100%';
+          container.style.height = 'auto';
+          container.style.minHeight = '0';
+          container.style.alignItems = 'stretch';
+
+          const card = createWidgetElement('section', 'canvas-layout-widget-surface');
+          card.style.width = '100%';
+          card.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', t('widgets.structure')));
+          if (!state || !Array.isArray(state.items) || state.items.length === 0) {
+            card.appendChild(createWidgetElement('div', 'canvas-layout-widget-empty', t('widgets.structureEmpty')));
+            container.appendChild(card);
+            return;
+          }
+
+          const actions = createWidgetElement('div', 'canvas-layout-button-stack is-column');
+          actions.style.flexWrap = 'nowrap';
+          for (const item of state.items) {
+            const button = createCanvasActionButton({
+              label: item.label,
+              caption: item.caption,
+              tone: item.active ? 'accent' : null,
+              onClick: function() {
+                selectPart(item.id);
+                setModeLabel('SELECT');
+              }
+            });
+            button.style.width = '100%';
+
+            function handleMouseEnter() {
+              setPreviewedPart(item.id);
+            }
+
+            function handleMouseLeave() {
+              setPreviewedPart(null);
+            }
+
+            button.addEventListener('mouseenter', handleMouseEnter);
+            button.addEventListener('mouseleave', handleMouseLeave);
+            button.addEventListener('focus', handleMouseEnter);
+            button.addEventListener('blur', handleMouseLeave);
+            cleanups.push(function() {
+              button.removeEventListener('mouseenter', handleMouseEnter);
+              button.removeEventListener('mouseleave', handleMouseLeave);
+              button.removeEventListener('focus', handleMouseEnter);
+              button.removeEventListener('blur', handleMouseLeave);
+            });
+
+            actions.appendChild(button);
+          }
+
+          card.appendChild(actions);
+          container.appendChild(card);
+
+          return function() {
+            setPreviewedPart(null);
+            while (cleanups.length) {
+              const cleanup = cleanups.pop();
+              cleanup();
+            }
           };
         }
       });
@@ -3514,6 +3611,11 @@
         ],
         leftTabs: [
           {
+            id: 'structure',
+            label: t('widgets.structure'),
+            renderContent: mountPanelWidget(structureWidget)
+          },
+          {
             id: 'add',
             label: t('widgets.add'),
             renderContent: mountPanelWidget(addPartWidget)
@@ -3576,7 +3678,7 @@
     function applyLocaleToUi() {
       syncStaticUiText();
       connectStrategyPanel.sync();
-      if (addPartWidget && selectedPartWidget && selectedJointWidget) {
+      if (addPartWidget && structureWidget && selectedPartWidget && selectedJointWidget) {
         mountCanvasLayoutPrototype();
       }
       updateConnectDebugUi();
@@ -3620,6 +3722,7 @@
     bindTargetSelectionStrategyUi();
 
     addPartWidget = createAddPartWidget();
+    structureWidget = createStructureWidget();
     selectedPartWidget = createSelectedPartWidget();
     selectedJointWidget = createSelectedJointWidget();
     snapStatusWidget = createSnapStatusWidget();
@@ -3634,6 +3737,7 @@
     elements.dragHud.style.display = 'none';
     elements.modeLabel.style.display = 'none';
     syncProfileLength(profileLengthValue);
+    structureWidget.update(buildStructureWidgetState());
     selectedPartWidget.update(buildSelectedPartWidgetState());
     selectedJointWidget.update(buildSelectedJointWidgetState());
     modeStatusWidget.update({ text: currentModeLabelText });

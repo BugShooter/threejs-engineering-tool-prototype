@@ -106,6 +106,7 @@
       clearHistoryCaption: 'Gesammelte Snapshots löschen'
     },
     widgets: {
+      structure: 'Struktur',
       add: 'Hinzufügen',
       part: 'Teil',
       joint: 'Verbindung',
@@ -113,6 +114,7 @@
       targetDebug: 'Debug der Zielauswahl',
       targetDebugNote: 'Die Diagnose liegt im Edge Drawer, damit sie die Haupt-Tabs nicht belegt. Die Einstellungen sind vertikal gruppiert und füllen die gesamte Drawer-Breite.',
       noData: 'Keine Daten',
+      structureEmpty: 'Keine Teile in der Szene',
       partEmpty: 'Kein Teil ausgewählt',
       jointEmpty: 'Keine Verbindung ausgewählt',
       choosePortCaption: 'Port auswählen',

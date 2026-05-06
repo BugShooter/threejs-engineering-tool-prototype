@@ -63,7 +63,7 @@
       '.canvas-layout-button-label{font-size:9px;color:#eef4ff;}',
       '.canvas-layout-button-caption{font-size:7px;color:#8da1cc;}',
       '.canvas-layout-tab-mount{min-width:0;min-height:0;display:flex;}',
-      '.canvas-layout-tab-mount.is-slot-constrained{width:100%;height:100%;justify-content:flex-end;align-items:flex-start;}',
+      '.canvas-layout-tab-mount.is-slot-constrained{max-width:100%;max-height:100%;min-height:0;justify-content:flex-end;align-items:flex-start;}',
       '.canvas-layout-widget-mount{display:flex;min-width:0;min-height:0;pointer-events:auto;}',
       '.canvas-layout-widget-surface{display:flex;flex-direction:column;gap:8px;border:1px solid #28344f;border-radius:8px;background:rgba(11,14,20,.9);box-shadow:0 18px 34px rgba(0,0,0,.24);backdrop-filter:blur(10px);color:#dce6ff;padding:7px 8px;min-width:0;}',
       '.canvas-layout-widget-title{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#dbe6ff;}',
@@ -122,7 +122,7 @@
       '.canvas-layout-tab-content::-webkit-scrollbar-thumb,.canvas-layout-drawer-body::-webkit-scrollbar-thumb,.canvas-layout-edge-drawer-body::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#5a8cdb 0%,#8ab9ff 100%);border:2px solid rgba(10,14,22,.92);border-radius:999px;}',
       '.canvas-layout-tab-content::-webkit-scrollbar-thumb:hover,.canvas-layout-drawer-body::-webkit-scrollbar-thumb:hover,.canvas-layout-edge-drawer-body::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#71a3f3 0%,#a4cbff 100%);}',
       '.canvas-layout-tab-panel.is-fill-height .canvas-layout-tab-content,.canvas-layout-tab-panel.is-slot-constrained .canvas-layout-tab-content{flex:1 1 auto;}',
-      '.canvas-layout-tab-panel[data-dock="left"] .canvas-layout-tab-content{min-width:280px;max-width:min(420px,calc(100vw - 360px));max-height:min(420px,100%);}',
+      '.canvas-layout-tab-panel[data-dock="left"] .canvas-layout-tab-content{min-width:280px;max-width:min(420px,calc(100vw - 360px));max-height:none;}',
       '.canvas-layout-tab-panel[data-dock="bottom"] .canvas-layout-tab-content{width:100%;min-height:180px;max-height:min(320px,42vh);}',
       '.canvas-layout-tab-panel.is-collapsed .canvas-layout-tab-content{display:none;}',
       '.canvas-layout-tab-grid{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));}',
@@ -379,6 +379,9 @@
                   type: 'layout',
                   direction: 'horizontal',
                   gap: 10,
+                  style: {
+                    alignItems: 'flex-start'
+                  },
                   children: [
                     {
                       type: 'tabs',
@@ -386,6 +389,7 @@
                       dock: 'left',
                       collapsed: true,
                       collapseMode: 'vertical-tabs',
+                      constrainHeightToSlot: true,
                       tabs: leftTabs
                     },
                     {
@@ -762,11 +766,6 @@
     if (config.constrainHeightToSlot) {
       mount.classList.add('is-slot-constrained');
     }
-    if (config.collapseMode === 'vertical-tabs') {
-      mount.style.width = 'max-content';
-      mount.style.height = 'max-content';
-      mount.style.flex = '0 0 auto';
-    }
     const panel = createElement('section', 'canvas-layout-tab-panel');
     panel.dataset.dock = config.dock || 'bottom';
     panel.dataset.collapseMode = config.collapseMode || 'compact-tabs';
@@ -795,6 +794,38 @@
       backdrop: null
     };
     let activeContentCleanup = null;
+
+    function syncMountSizing() {
+      const useCollapsedVerticalTabs = config.collapseMode === 'vertical-tabs' && state.collapsed;
+      if (useCollapsedVerticalTabs) {
+        mount.style.width = 'max-content';
+        mount.style.height = 'max-content';
+        mount.style.maxHeight = '';
+        mount.style.flex = '0 0 auto';
+        return;
+      }
+
+      if (config.fillHeight) {
+        mount.style.width = '100%';
+        mount.style.height = '100%';
+        mount.style.maxHeight = '';
+        mount.style.flex = '1 1 auto';
+        return;
+      }
+
+      if (config.constrainHeightToSlot) {
+        mount.style.width = '';
+        mount.style.height = '100%';
+        mount.style.maxHeight = '';
+        mount.style.flex = '';
+        return;
+      }
+
+      mount.style.width = '';
+      mount.style.height = '';
+      mount.style.maxHeight = '';
+      mount.style.flex = '';
+    }
 
     function handleDocumentKeyDown(event) {
       if (!state.fullscreen || event.key !== 'Escape') {
@@ -952,6 +983,7 @@
     }
 
     function render() {
+      syncMountSizing();
       panel.classList.toggle('is-collapsed', state.collapsed);
       panel.classList.toggle('is-fill-height', !!config.fillHeight && !state.collapsed);
       panel.classList.toggle('is-slot-constrained', !!config.constrainHeightToSlot && !state.collapsed && !state.fullscreen);
@@ -984,7 +1016,6 @@
     panel.style.setProperty('--drawer-width', drawerWidthValue);
     panel.style.setProperty('--drawer-handle-size', handleSizeValue);
     applyInlineStyles(panel, config.style);
-
     handle.type = 'button';
     panel.appendChild(body);
     panel.appendChild(handle);

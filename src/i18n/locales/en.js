@@ -106,6 +106,7 @@
       clearHistoryCaption: 'Clear accumulated snapshots'
     },
     widgets: {
+      structure: 'Structure',
       add: 'Add',
       part: 'Part',
       joint: 'Connection',
@@ -113,6 +114,7 @@
       targetDebug: 'Target Selection Debug',
       targetDebugNote: 'Diagnostics live in the edge drawer so they do not occupy the main tabs. Settings are grouped vertically and stretch to the full drawer width.',
       noData: 'No data',
+      structureEmpty: 'No parts in scene',
       partEmpty: 'No part selected',
       jointEmpty: 'No connection selected',
       choosePortCaption: 'Choose a port',
