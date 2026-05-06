@@ -41,6 +41,8 @@
       '.canvas-layout-flow{display:flex;min-width:0;min-height:0;width:100%;height:100%;pointer-events:none;}',
       '.canvas-layout-flow.is-vertical{flex-direction:column;}',
       '.canvas-layout-flow.is-horizontal{flex-direction:row;}',
+      '.canvas-layout-flow[data-layout-id="left-panel-row"]>.canvas-layout-tab-mount{flex:1 1 auto;min-width:0;}',
+      '.canvas-layout-flow[data-layout-id="left-icon-rail-row"]{width:max-content;flex:0 0 auto;height:auto;}',
       '.canvas-layout-slot{display:grid;min-width:0;min-height:0;pointer-events:none;}',
       '.canvas-layout-slot.is-overlay-host{position:relative;overflow:visible;}',
       '.canvas-layout-slot>*{min-width:0;min-height:0;pointer-events:none;}',
@@ -64,6 +66,7 @@
       '.canvas-layout-button-caption{font-size:7px;color:#8da1cc;}',
       '.canvas-layout-tab-mount{min-width:0;min-height:0;display:flex;}',
       '.canvas-layout-tab-mount.is-slot-constrained{max-width:100%;max-height:100%;min-height:0;justify-content:flex-end;align-items:flex-start;}',
+      '.canvas-layout-tab-mount.is-slot-constrained[data-dock="left"]{justify-content:flex-start;}',
       '.canvas-layout-widget-mount{display:flex;min-width:0;min-height:0;pointer-events:auto;}',
       '.canvas-layout-widget-surface{display:flex;flex-direction:column;gap:8px;border:1px solid #28344f;border-radius:8px;background:rgba(11,14,20,.9);box-shadow:0 18px 34px rgba(0,0,0,.24);backdrop-filter:blur(10px);color:#dce6ff;padding:7px 8px;min-width:0;}',
       '.canvas-layout-widget-title{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#dbe6ff;}',
@@ -95,13 +98,18 @@
       '.canvas-layout-tab-panel.is-slot-constrained .canvas-layout-tab-shell{max-height:100%;}',
       '.canvas-layout-tab-panel.is-fill-height .canvas-layout-tab-shell{height:100%;}',
       '.canvas-layout-tab-strip{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 8px 6px 8px;min-width:0;}',
-      '.canvas-layout-tab-list{display:flex;flex:1 1 auto;gap:6px;min-width:0;overflow-x:auto;}',
+      '.canvas-layout-tab-list-viewport{display:flex;flex:1 1 auto;min-width:0;overflow:hidden;}',
+      '.canvas-layout-tab-list{display:flex;flex:1 1 auto;gap:6px;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none;scroll-behavior:smooth;}',
+      '.canvas-layout-tab-list::-webkit-scrollbar{display:none;}',
       '.canvas-layout-tab-actions{display:flex;flex:0 0 auto;gap:4px;}',
       '.canvas-layout-tab-action,.canvas-layout-tab-button{border:1px solid #324264;border-radius:6px;background:rgba(23,30,44,.9);color:#dce6ff;font-family:"JetBrains Mono",monospace;cursor:pointer;transition:border-color .12s,background .12s,transform .12s;}',
       '.canvas-layout-tab-action:hover{border-color:#67a6ff;background:rgba(29,38,55,.96);transform:translateY(-1px);}',
       '.canvas-layout-tab-button:hover{border-color:#67a6ff;background:rgba(29,38,55,.96);transform:none;}',
       '.canvas-layout-tab-action{width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:11px;}',
-      '.canvas-layout-tab-button{display:flex;align-items:center;justify-content:center;padding:6px 8px;min-height:28px;font-size:8px;letter-spacing:.06em;color:#9bb2df;white-space:nowrap;}',
+      '.canvas-layout-tab-action.is-hidden{display:none;}',
+      '.canvas-layout-tab-action[aria-disabled="true"]{opacity:.42;cursor:default;transform:none;}',
+      '.canvas-layout-tab-action[aria-disabled="true"]:hover{border-color:#324264;background:rgba(23,30,44,.9);transform:none;}',
+      '.canvas-layout-tab-button{display:flex;flex:0 0 auto;align-items:center;justify-content:center;padding:6px 8px;min-height:28px;font-size:8px;letter-spacing:.06em;color:#9bb2df;white-space:nowrap;}',
       '.canvas-layout-tab-button.is-active{border-color:#74b0ff;color:#eef4ff;background:rgba(26,41,68,.96);}',
       '.canvas-layout-tab-panel.is-collapsed{background:transparent;border:none;box-shadow:none;backdrop-filter:none;}',
       '.canvas-layout-tab-panel.is-collapsed .canvas-layout-tab-strip{padding:0;gap:0;overflow:hidden;}',
@@ -122,6 +130,7 @@
       '.canvas-layout-tab-content::-webkit-scrollbar-thumb,.canvas-layout-drawer-body::-webkit-scrollbar-thumb,.canvas-layout-edge-drawer-body::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#5a8cdb 0%,#8ab9ff 100%);border:2px solid rgba(10,14,22,.92);border-radius:999px;}',
       '.canvas-layout-tab-content::-webkit-scrollbar-thumb:hover,.canvas-layout-drawer-body::-webkit-scrollbar-thumb:hover,.canvas-layout-edge-drawer-body::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#71a3f3 0%,#a4cbff 100%);}',
       '.canvas-layout-tab-panel.is-fill-height .canvas-layout-tab-content,.canvas-layout-tab-panel.is-slot-constrained .canvas-layout-tab-content{flex:1 1 auto;}',
+      '.canvas-layout-tab-panel[data-dock="left"]:not(.is-collapsed){min-width:300px;}',
       '.canvas-layout-tab-panel[data-dock="left"] .canvas-layout-tab-content{min-width:280px;max-width:min(420px,calc(100vw - 360px));max-height:none;}',
       '.canvas-layout-tab-panel[data-dock="bottom"] .canvas-layout-tab-content{width:100%;min-height:180px;max-height:min(320px,42vh);}',
       '.canvas-layout-tab-panel.is-collapsed .canvas-layout-tab-content{display:none;}',
@@ -147,6 +156,10 @@
       '.canvas-layout-prototype-modal .canvas-layout-tab-panel{width:100% !important;height:100%;max-width:none;margin:0 !important;}',
       '.canvas-layout-prototype-modal .canvas-layout-tab-shell{height:100%;}',
       '.canvas-layout-prototype-modal .canvas-layout-tab-panel[data-dock="bottom"] .canvas-layout-tab-content{height:100%;max-height:none;}',
+      '.canvas-layout-catalog-modal-backdrop{position:absolute;inset:0;padding:var(--canvas-layout-system-inset);display:flex;align-items:center;justify-content:center;background:rgba(4,7,12,.58);backdrop-filter:blur(10px);pointer-events:auto;}',
+      '.canvas-layout-catalog-modal{width:min(460px,100%);max-width:460px;max-height:min(100%,720px);padding:10px 10px 12px 10px;box-shadow:0 24px 46px rgba(0,0,0,.34);}',
+      '.canvas-layout-catalog-modal-preview{width:100%;aspect-ratio:16 / 9;object-fit:cover;border-radius:8px;border:1px solid #2f3f63;background:rgba(16,21,31,.92);}',
+      '.canvas-layout-catalog-modal .canvas-layout-widget-actions .canvas-layout-button{flex:1 1 0;min-width:0;}',
       '.canvas-layout-icon-rail{display:flex;flex-direction:column;gap:6px;padding:5px;align-self:flex-start;}',
       '.canvas-layout-icon-rail.is-ghost{background:transparent;border:none;box-shadow:none;backdrop-filter:none;padding:0;}',
       '.canvas-layout-icon-button{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border:1px solid #34476b;border-radius:6px;background:rgba(23,30,44,.92);color:#dfe8ff;font-family:"JetBrains Mono",monospace;font-size:21px;cursor:pointer;transition:border-color .12s,background .12s,transform .12s;}',
@@ -171,8 +184,8 @@
       '.canvas-layout-edge-drawer-body>.canvas-layout-widget-mount{width:100%;height:100%;align-items:stretch;}',
       '.canvas-layout-edge-drawer-handle{position:absolute;top:-1px;right:-1px;bottom:-1px;width:var(--drawer-handle-size,32px);display:flex;align-items:center;justify-content:center;padding:10px 4px;border:1px solid #324264;border-left:none;border-radius:0 10px 10px 0;background:rgba(20,27,40,.98);color:#dce6ff;font-family:"JetBrains Mono",monospace;font-size:8px;letter-spacing:.08em;text-transform:uppercase;writing-mode:vertical-rl;text-orientation:mixed;cursor:pointer;transition:border-color .12s,background .12s,transform .12s,opacity .12s;pointer-events:auto;opacity:.96;}',
       '.canvas-layout-edge-drawer-handle:hover{border-color:#67a6ff;background:rgba(29,38,55,.98);}',
-      '@media (max-width: 1180px){.canvas-layout-prototype,.canvas-layout-prototype-modal-host{--canvas-layout-system-inset:14px;}.canvas-layout-flow[data-layout-id="top-row"]{padding-right:0 !important;}.canvas-layout-tab-panel[data-dock="left"] .canvas-layout-tab-content{min-width:240px;}.canvas-layout-button{min-width:104px;}}',
-      '@media (max-width: 900px){.canvas-layout-prototype,.canvas-layout-prototype-modal-host{--canvas-layout-system-inset:12px;}.canvas-layout-prototype-stage{overflow:auto;}.canvas-layout-flow.is-horizontal>.canvas-layout-slot{flex:0 0 auto !important;}.canvas-layout-flow.is-horizontal{flex-direction:column;}.canvas-layout-slot{justify-items:stretch !important;}.canvas-layout-card,.canvas-layout-tab-panel[data-dock="left"] .canvas-layout-tab-content{max-width:none;}.canvas-layout-tab-panel[data-dock="bottom"] .canvas-layout-tab-content{min-height:96px;}.canvas-layout-tab-panel.is-fill-height,.canvas-layout-tab-panel.is-fill-height .canvas-layout-tab-shell{height:auto;}.canvas-layout-tab-panel.is-fill-height .canvas-layout-tab-content{flex:0 0 auto;}.canvas-layout-tab-panel.is-collapsed .canvas-layout-tab-list{flex-wrap:wrap;}}'
+      '@media (max-width: 1180px){.canvas-layout-prototype,.canvas-layout-prototype-modal-host{--canvas-layout-system-inset:14px;}.canvas-layout-flow[data-layout-id="top-row"]{padding-right:0 !important;}.canvas-layout-tab-panel[data-dock="left"]:not(.is-collapsed){min-width:300px;}.canvas-layout-tab-panel[data-dock="left"] .canvas-layout-tab-content{min-width:240px;}.canvas-layout-button{min-width:104px;}}',
+      '@media (max-width: 900px){.canvas-layout-prototype,.canvas-layout-prototype-modal-host{--canvas-layout-system-inset:12px;}.canvas-layout-prototype-stage{overflow:auto;}.canvas-layout-flow.is-horizontal>.canvas-layout-slot{flex:0 0 auto !important;}.canvas-layout-flow.is-horizontal{flex-direction:column;}.canvas-layout-flow[data-layout-id="left-panel-row"],.canvas-layout-flow[data-layout-id="left-icon-rail-row"]{flex-direction:row !important;}.canvas-layout-slot{justify-items:stretch !important;}.canvas-layout-card,.canvas-layout-tab-panel[data-dock="left"] .canvas-layout-tab-content{max-width:none;}.canvas-layout-tab-panel[data-dock="left"]:not(.is-collapsed){min-width:300px;}.canvas-layout-tab-panel[data-dock="bottom"] .canvas-layout-tab-content{min-height:96px;}.canvas-layout-tab-panel.is-fill-height,.canvas-layout-tab-panel.is-fill-height .canvas-layout-tab-shell{height:auto;}.canvas-layout-tab-panel.is-fill-height .canvas-layout-tab-content{flex:0 0 auto;}.canvas-layout-tab-panel.is-collapsed .canvas-layout-tab-list{flex-wrap:wrap;}}'
     ].join('');
     document.head.appendChild(style);
   }
@@ -261,6 +274,9 @@
           { icon: '⚙', label: 'Tools' },
           { icon: '◌', label: 'Debug' }
         ];
+    const secondaryIconRailItems = Array.isArray(config.secondaryIconRailItems) && config.secondaryIconRailItems.length
+      ? config.secondaryIconRailItems
+      : [];
     const centerWidgets = Array.isArray(config.centerWidgets) ? config.centerWidgets.filter(Boolean) : [];
     const topRightTabs = Array.isArray(config.topRightTabs) && config.topRightTabs.length
       ? config.topRightTabs
@@ -371,12 +387,13 @@
               {
                 type: 'slot',
                 grow: 1,
-                basis: '0px',
+                basis: '380px',
                 alignX: 'left',
                 alignY: 'top',
                 overlayChildren: leftCellOverlays,
                 content: {
                   type: 'layout',
+                  id: 'left-panel-row',
                   direction: 'horizontal',
                   gap: 10,
                   style: {
@@ -393,9 +410,28 @@
                       tabs: leftTabs
                     },
                     {
-                      type: 'iconRail',
-                      hideSurface: true,
-                      items: iconRailItems
+                      type: 'layout',
+                      id: 'left-icon-rail-row',
+                      direction: 'horizontal',
+                      gap: 8,
+                      style: {
+                        alignItems: 'flex-start'
+                      },
+                      children: [
+                        {
+                          type: 'iconRail',
+                          hideSurface: true,
+                          items: iconRailItems
+                        }
+                      ].concat(secondaryIconRailItems.length
+                        ? [
+                            {
+                              type: 'iconRail',
+                              hideSurface: true,
+                              items: secondaryIconRailItems
+                            }
+                          ]
+                        : [])
                     }
                   ]
                 }
@@ -759,6 +795,7 @@
 
   function createTabPanelWidget(config, environment) {
     const mount = createElement('div', 'canvas-layout-tab-mount');
+    mount.dataset.dock = config.dock || 'bottom';
     if (config.fillHeight) {
       mount.style.width = '100%';
       mount.style.height = '100%';
@@ -776,11 +813,24 @@
 
     const shell = createElement('div', 'canvas-layout-tab-shell');
     const strip = createElement('div', 'canvas-layout-tab-strip');
+    const scrollPrevButton = createElement('button', 'canvas-layout-tab-action', '←');
+    const tabListViewport = createElement('div', 'canvas-layout-tab-list-viewport');
     const tabList = createElement('div', 'canvas-layout-tab-list');
+    const scrollNextButton = createElement('button', 'canvas-layout-tab-action', '→');
     const actions = createElement('div', 'canvas-layout-tab-actions');
     const content = createElement('div', 'canvas-layout-tab-content');
 
-    strip.appendChild(tabList);
+    scrollPrevButton.type = 'button';
+    scrollPrevButton.title = t('actions.previous', 'Previous');
+    scrollPrevButton.setAttribute('aria-label', t('actions.previous', 'Previous'));
+    scrollNextButton.type = 'button';
+    scrollNextButton.title = t('actions.next', 'Next');
+    scrollNextButton.setAttribute('aria-label', t('actions.next', 'Next'));
+
+    tabListViewport.appendChild(tabList);
+    strip.appendChild(scrollPrevButton);
+    strip.appendChild(tabListViewport);
+    strip.appendChild(scrollNextButton);
     strip.appendChild(actions);
     shell.appendChild(strip);
     shell.appendChild(content);
@@ -794,6 +844,34 @@
       backdrop: null
     };
     let activeContentCleanup = null;
+
+    function getTabScrollStep() {
+      return Math.max(96, Math.round(tabListViewport.clientWidth * 0.72));
+    }
+
+    function syncTabScrollButtons() {
+      const needsScrollButtons = !state.collapsed && tabList.scrollWidth > tabList.clientWidth + 1;
+      scrollPrevButton.classList.toggle('is-hidden', !needsScrollButtons);
+      scrollNextButton.classList.toggle('is-hidden', !needsScrollButtons);
+
+      if (!needsScrollButtons) {
+        scrollPrevButton.setAttribute('aria-disabled', 'true');
+        scrollNextButton.setAttribute('aria-disabled', 'true');
+        return;
+      }
+
+      const atStart = tabList.scrollLeft <= 1;
+      const atEnd = tabList.scrollLeft + tabList.clientWidth >= tabList.scrollWidth - 1;
+      scrollPrevButton.setAttribute('aria-disabled', atStart ? 'true' : 'false');
+      scrollNextButton.setAttribute('aria-disabled', atEnd ? 'true' : 'false');
+    }
+
+    function scrollTabList(direction) {
+      tabList.scrollBy({
+        left: getTabScrollStep() * direction,
+        behavior: 'smooth'
+      });
+    }
 
     function syncMountSizing() {
       const useCollapsedVerticalTabs = config.collapseMode === 'vertical-tabs' && state.collapsed;
@@ -848,6 +926,40 @@
           state.backdrop.remove();
           state.backdrop = null;
         }
+      });
+    }
+
+    tabList.addEventListener('scroll', syncTabScrollButtons);
+    scrollPrevButton.addEventListener('click', function(event) {
+      event.preventDefault();
+      if (scrollPrevButton.getAttribute('aria-disabled') === 'true') {
+        return;
+      }
+      scrollTabList(-1);
+    });
+    scrollNextButton.addEventListener('click', function(event) {
+      event.preventDefault();
+      if (scrollNextButton.getAttribute('aria-disabled') === 'true') {
+        return;
+      }
+      scrollTabList(1);
+    });
+
+    if (typeof ResizeObserver === 'function') {
+      const resizeObserver = new ResizeObserver(function() {
+        syncTabScrollButtons();
+      });
+      resizeObserver.observe(tabListViewport);
+      resizeObserver.observe(tabList);
+      if (environment.cleanups) {
+        environment.cleanups.push(function() {
+          resizeObserver.disconnect();
+        });
+      }
+    }
+    if (environment.cleanups) {
+      environment.cleanups.push(function() {
+        tabList.removeEventListener('scroll', syncTabScrollButtons);
       });
     }
 
@@ -956,6 +1068,10 @@
         });
         tabList.appendChild(button);
       });
+      const activeButton = tabList.querySelector('.canvas-layout-tab-button.is-active');
+      if (activeButton && typeof activeButton.scrollIntoView === 'function' && !state.collapsed) {
+        activeButton.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
     }
 
     function renderContent() {
@@ -991,6 +1107,7 @@
       renderTabs();
       renderActions();
       renderContent();
+      requestAnimationFrame(syncTabScrollButtons);
     }
 
     render();

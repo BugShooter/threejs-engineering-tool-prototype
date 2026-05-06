@@ -61,7 +61,8 @@
         id: this.nextPartId(),
         typeId,
         params: this.catalog.normalizeParams(typeId, params || {}),
-        transform: normalizeTransform(transform)
+        transform: normalizeTransform(transform),
+        meta: {}
       };
       this.parts.push(part);
       return part;
@@ -251,7 +252,8 @@
           id: rawPart.id || this.nextPartId(),
           typeId: rawPart.typeId,
           params: this.catalog.normalizeParams(rawPart.typeId, rawPart.params || {}),
-          transform: normalizeTransform(rawPart.transform)
+          transform: normalizeTransform(rawPart.transform),
+          meta: cloneValue(rawPart.meta || {})
         };
         this.parts.push(part);
         this.partSeq = Math.max(this.partSeq, extractSeq(part.id, 'part'));

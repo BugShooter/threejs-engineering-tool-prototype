@@ -29,6 +29,8 @@
   const CLICK_DRAG_THRESHOLD = 6;
   const DEFAULT_UNDO_HISTORY_LIMIT = 20;
   const MAX_UNDO_HISTORY_LIMIT = 100;
+  const ASSEMBLY_CATALOG_STORAGE_KEY = 'engineering-tool.assembly-catalog.v1';
+  const MAX_ASSEMBLY_CATALOG_ENTRIES = 60;
   const EDGE_DRAWER_PRESETS = Object.freeze({
     subtleHandle: Object.freeze({
       visibleEdgeWidth: '10px',
@@ -172,6 +174,7 @@
     let selectedJointId = null;
     let hoveredJointId = null;
     let previewedPartId = null;
+    let previewedPartIds = new Set();
     let snapAlign = true;
     let gizmoMode = 'move';
     let mode = 'idle';
@@ -247,6 +250,11 @@
     let snapStatusWidget = null;
     let modeStatusWidget = null;
     let interactionStatusWidget = null;
+    let assemblyCatalogWidget = null;
+    let savedAssembliesWidget = null;
+    let savedAssemblyEntries = loadAssemblyCatalogEntries();
+    let assemblyCatalogDraft = null;
+    let assemblyCatalogDraftModalCleanup = null;
 
     function t(key, replacements) {
       if (!i18n || !key) {
@@ -297,6 +305,296 @@
 
     function formatMillimeters(value) {
       return `${value} ${t('common.mm')}`;
+    }
+
+    function getAssemblyCatalogStorage() {
+      try {
+        return window.localStorage || null;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function createAssemblyCatalogEntryId() {
+      return `assembly-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    function normalizeAssemblyCatalogSnapshot(snapshot) {
+      const normalizedSnapshot = snapshot && typeof snapshot === 'object' ? snapshot : {};
+      return {
+        schemaVersion: Number.isFinite(normalizedSnapshot.schemaVersion) ? normalizedSnapshot.schemaVersion : 1,
+        catalogId: normalizedSnapshot.catalogId || catalog.catalogId,
+        parts: Array.isArray(normalizedSnapshot.parts) ? normalizedSnapshot.parts : [],
+        joints: Array.isArray(normalizedSnapshot.joints) ? normalizedSnapshot.joints : [],
+        editor: normalizedSnapshot.editor && typeof normalizedSnapshot.editor === 'object'
+          ? normalizedSnapshot.editor
+          : {}
+      };
+    }
+
+    function normalizeAssemblyCatalogEntry(entry) {
+      if (!entry || typeof entry !== 'object') {
+        return null;
+      }
+
+      const snapshot = normalizeAssemblyCatalogSnapshot(entry.snapshot);
+      if (!snapshot.parts.length) {
+        return null;
+      }
+
+      const savedAt = Number(entry.savedAt);
+      const partCount = Number(entry.partCount);
+      const jointCount = Number(entry.jointCount);
+      return {
+        id: typeof entry.id === 'string' && entry.id ? entry.id : createAssemblyCatalogEntryId(),
+        name: typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim() : 'Unnamed assembly',
+        scope: entry.scope === 'scene' ? 'scene' : 'selection',
+        savedAt: Number.isFinite(savedAt) ? savedAt : Date.now(),
+        partCount: Number.isFinite(partCount) ? Math.max(0, Math.round(partCount)) : snapshot.parts.length,
+        jointCount: Number.isFinite(jointCount) ? Math.max(0, Math.round(jointCount)) : snapshot.joints.length,
+        thumbnailDataUrl: typeof entry.thumbnailDataUrl === 'string' ? entry.thumbnailDataUrl : '',
+        snapshot: snapshot
+      };
+    }
+
+    function sortAssemblyCatalogEntries(entries) {
+      return entries
+        .slice()
+        .sort(function(a, b) {
+          return b.savedAt - a.savedAt;
+        })
+        .slice(0, MAX_ASSEMBLY_CATALOG_ENTRIES);
+    }
+
+    function loadAssemblyCatalogEntries() {
+      const storage = getAssemblyCatalogStorage();
+      if (!storage) {
+        return [];
+      }
+
+      try {
+        const raw = storage.getItem(ASSEMBLY_CATALOG_STORAGE_KEY);
+        if (!raw) {
+          return [];
+        }
+
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+          return [];
+        }
+
+        return sortAssemblyCatalogEntries(parsed.map(normalizeAssemblyCatalogEntry).filter(Boolean));
+      } catch (error) {
+        return [];
+      }
+    }
+
+    function persistAssemblyCatalogEntries(entries) {
+      const storage = getAssemblyCatalogStorage();
+      if (!storage) {
+        return false;
+      }
+
+      try {
+        storage.setItem(ASSEMBLY_CATALOG_STORAGE_KEY, JSON.stringify(entries));
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function escapeSvgText(value) {
+      return String(value || '').replace(/[&<>"']/g, function(character) {
+        const replacements = {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&apos;'
+        };
+        return replacements[character] || character;
+      });
+    }
+
+    function getAssemblyCatalogScopeLabel(scope) {
+      return scope === 'scene' ? t('catalog.scopeScene') : t('catalog.scopeSelection');
+    }
+
+    function escapeRegExp(value) {
+      return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function getNextAssemblyCatalogDefaultName() {
+      const baseName = t('catalog.defaultNameBase');
+      const pattern = new RegExp(`^${escapeRegExp(baseName)}(?:\\s*-\\s*(\\d+))?$`, 'i');
+      let maxNumber = 0;
+
+      for (const entry of savedAssemblyEntries) {
+        const match = pattern.exec(String(entry && entry.name ? entry.name : '').trim());
+        if (!match) {
+          continue;
+        }
+        const number = match[1] ? Number(match[1]) : 1;
+        maxNumber = Math.max(maxNumber, Number.isFinite(number) && number > 0 ? number : 1);
+      }
+
+      return `${baseName} - ${maxNumber + 1}`;
+    }
+
+    function buildAssemblyCatalogPreviewDataUrl(entry) {
+      const accent = entry.scope === 'scene' ? '#5a8cdb' : '#2bcf88';
+      const secondary = getAssemblyCatalogScopeLabel(entry.scope);
+      const metrics = `${entry.partCount} ${t('catalog.parts')} · ${entry.jointCount} ${t('selection.connections')}`;
+      const svg = [
+        '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="270" viewBox="0 0 480 270">',
+        '<defs>',
+        '<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">',
+        '<stop offset="0%" stop-color="#111722"/>',
+        '<stop offset="100%" stop-color="#1f2f4d"/>',
+        '</linearGradient>',
+        '</defs>',
+        '<rect width="480" height="270" rx="20" fill="url(#bg)"/>',
+        `<rect x="26" y="26" width="428" height="218" rx="16" fill="rgba(8,12,18,0.34)" stroke="${accent}" stroke-width="2"/>`,
+        `<rect x="26" y="26" width="428" height="10" rx="5" fill="${accent}" opacity="0.92"/>`,
+        `<text x="42" y="82" fill="#eef4ff" font-family="JetBrains Mono, monospace" font-size="28">${escapeSvgText(entry.name)}</text>`,
+        `<text x="42" y="118" fill="#9cb1d8" font-family="JetBrains Mono, monospace" font-size="16">${escapeSvgText(secondary)}</text>`,
+        `<text x="42" y="218" fill="#dbe6ff" font-family="JetBrains Mono, monospace" font-size="18">${escapeSvgText(metrics)}</text>`,
+        '</svg>'
+      ].join('');
+      return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+    }
+
+    function captureAssemblyCatalogThumbnailDataUrl(snapshot) {
+      const normalizedSnapshot = normalizeAssemblyCatalogSnapshot(snapshot);
+      const parts = Array.isArray(normalizedSnapshot.parts) ? normalizedSnapshot.parts : [];
+      if (!parts.length) {
+        return '';
+      }
+
+      const targetWidth = 320;
+      const targetHeight = 180;
+      const previewCanvas = document.createElement('canvas');
+      previewCanvas.width = targetWidth;
+      previewCanvas.height = targetHeight;
+
+      let renderer = null;
+      let previewRoot = null;
+      let grid = null;
+
+      try {
+        renderer = new THREE.WebGLRenderer({
+          canvas: previewCanvas,
+          antialias: true,
+          alpha: false,
+          preserveDrawingBuffer: true
+        });
+        renderer.setPixelRatio(1);
+        renderer.setSize(targetWidth, targetHeight, false);
+        renderer.setClearColor(0x0a0c10, 1);
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(36, targetWidth / targetHeight, 1, 10000);
+
+        scene.add(new THREE.AmbientLight(0x334477, 1.1));
+
+        const keyLight = new THREE.DirectionalLight(0xffffff, 1.1);
+        keyLight.position.set(260, 340, 220);
+        scene.add(keyLight);
+
+        const fillLight = new THREE.DirectionalLight(0x4466ff, 0.45);
+        fillLight.position.set(-180, 120, -160);
+        scene.add(fillLight);
+
+        previewRoot = new THREE.Group();
+        scene.add(previewRoot);
+
+        for (const rawPart of parts) {
+          const typeDef = getTypeDef(rawPart);
+          if (!typeDef) {
+            continue;
+          }
+
+          const group = createPartVisualGroup(typeDef, rawPart, {
+            selected: false,
+            highlighted: false
+          });
+          group.position.copy(getPartPositionVector(rawPart));
+          group.quaternion.copy(getPartQuaternion(rawPart));
+          previewRoot.add(group);
+        }
+
+        if (!previewRoot.children.length) {
+          return '';
+        }
+
+        const bounds = new THREE.Box3().setFromObject(previewRoot);
+        if (bounds.isEmpty()) {
+          return '';
+        }
+
+        const center = bounds.getCenter(new THREE.Vector3());
+        const size = bounds.getSize(new THREE.Vector3());
+        previewRoot.position.sub(center);
+
+        const maxSpan = Math.max(size.x, size.y, size.z, PROFILE_SIZE * 2);
+        const gridSize = Math.max(Math.ceil(maxSpan / 50) * 100, 200);
+        grid = new THREE.GridHelper(gridSize, Math.max(10, Math.round(gridSize / 50)), 0x243252, 0x161d2b);
+        grid.position.y = -size.y * 0.5 - PROFILE_SIZE * 0.2;
+        scene.add(grid);
+
+        const sphere = new THREE.Sphere();
+        bounds.getBoundingSphere(sphere);
+        const radius = Math.max(sphere.radius, PROFILE_SIZE * 2);
+        const fovRadians = THREE.MathUtils.degToRad(camera.fov);
+        const cameraDistance = Math.max(radius / Math.sin(fovRadians * 0.5), maxSpan * 1.6, 160);
+        const viewDirection = new THREE.Vector3(1, 0.65, 1.15).normalize();
+        camera.position.copy(viewDirection.multiplyScalar(cameraDistance));
+        camera.lookAt(0, 0, 0);
+        camera.updateProjectionMatrix();
+
+        renderer.render(scene, camera);
+        return previewCanvas.toDataURL('image/png');
+      } catch (error) {
+        return '';
+      } finally {
+        if (previewRoot) {
+          disposeObject3D(previewRoot);
+        }
+        if (grid) {
+          disposeObject3D(grid);
+        }
+        if (renderer) {
+          if (typeof renderer.dispose === 'function') {
+            renderer.dispose();
+          }
+          if (typeof renderer.forceContextLoss === 'function') {
+            renderer.forceContextLoss();
+          }
+        }
+      }
+    }
+
+    function commitAssemblyCatalogEntries(nextEntries) {
+      const normalizedEntries = sortAssemblyCatalogEntries(nextEntries.map(normalizeAssemblyCatalogEntry).filter(Boolean));
+      if (!persistAssemblyCatalogEntries(normalizedEntries)) {
+        window.alert(t('catalog.storageUnavailable'));
+        return false;
+      }
+
+      savedAssemblyEntries = normalizedEntries;
+      refreshAssemblyCatalogWidget();
+      return true;
+    }
+
+    function updateAssemblyCatalogEntry(entryId, updater) {
+      return commitAssemblyCatalogEntries(savedAssemblyEntries.map(function(entry) {
+        if (entry.id !== entryId) {
+          return entry;
+        }
+
+        const nextEntry = typeof updater === 'function' ? updater(entry) : entry;
+        return nextEntry || entry;
+      }));
     }
 
     function getPartTypeLabel(typeDef) {
@@ -743,20 +1041,50 @@
       return selectedJointId ? getJoint(selectedJointId) : null;
     }
 
-    function setPreviewedPart(partId) {
-      const nextPartId = partId && getPart(partId) ? partId : null;
-      if (nextPartId === previewedPartId) {
+    function arePartIdSetsEqual(first, second) {
+      if (first === second) {
+        return true;
+      }
+      if (!first || !second || first.size !== second.size) {
+        return false;
+      }
+      for (const partId of first) {
+        if (!second.has(partId)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function setPreviewedParts(partIds) {
+      const nextPreviewedPartIds = new Set(
+        (Array.isArray(partIds) ? partIds : []).filter(function(partId) {
+          return !!getPart(partId);
+        })
+      );
+      if (arePartIdSetsEqual(previewedPartIds, nextPreviewedPartIds)) {
         return;
       }
 
-      const previousPartId = previewedPartId;
-      previewedPartId = nextPartId;
-      if (previousPartId && getPart(previousPartId)) {
-        syncPartView(previousPartId);
+      const previousPreviewedPartIds = previewedPartIds;
+      previewedPartIds = nextPreviewedPartIds;
+      previewedPartId = previewedPartIds.size === 1
+        ? Array.from(previewedPartIds)[0]
+        : null;
+
+      const dirtyPartIds = new Set(previousPreviewedPartIds);
+      for (const partId of previewedPartIds) {
+        dirtyPartIds.add(partId);
       }
-      if (previewedPartId && getPart(previewedPartId)) {
-        syncPartView(previewedPartId);
+      for (const partId of dirtyPartIds) {
+        if (getPart(partId)) {
+          syncPartView(partId);
+        }
       }
+    }
+
+    function setPreviewedPart(partId) {
+      setPreviewedParts(partId ? [partId] : []);
     }
 
     function setHoveredJoint(jointId) {
@@ -806,7 +1134,7 @@
 
       const group = createPartVisualGroup(getTypeDef(part), part, {
         selected: selectedPartId === partId,
-        highlighted: selectedPartId !== partId && previewedPartId === partId
+        highlighted: selectedPartId !== partId && previewedPartIds.has(partId)
       });
       group.position.copy(getPartPositionVector(part));
       group.quaternion.copy(getPartQuaternion(part));
@@ -880,6 +1208,219 @@
 
     function createEditorSnapshotKey(snapshot) {
       return JSON.stringify(snapshot);
+    }
+
+    function buildAssemblyCatalogSnapshot(scope) {
+      const baseSnapshot = serializeAssembly(assembly, { editor: {} });
+      const defaultName = getNextAssemblyCatalogDefaultName();
+      if (scope === 'scene') {
+        return {
+          scope: 'scene',
+          snapshot: Object.assign({}, baseSnapshot, { editor: {} }),
+          partCount: baseSnapshot.parts.length,
+          jointCount: baseSnapshot.joints.length,
+          defaultName: defaultName
+        };
+      }
+
+      const selectedPart = getSelectedPart();
+      if (!selectedPart) {
+        return null;
+      }
+
+      const component = assembly.getConnectedComponent(selectedPart.id);
+      if (!component.parts.length) {
+        return null;
+      }
+
+      const allowedPartIds = new Set(component.partIds);
+      return {
+        scope: 'selection',
+        snapshot: Object.assign({}, baseSnapshot, {
+          parts: baseSnapshot.parts.filter(function(part) {
+            return allowedPartIds.has(part.id);
+          }),
+          joints: baseSnapshot.joints.filter(function(joint) {
+            return allowedPartIds.has(joint.a.partId) && allowedPartIds.has(joint.b.partId);
+          }),
+          editor: {
+            rootPartId: selectedPart.id
+          }
+        }),
+        partCount: component.parts.length,
+        jointCount: component.joints.length,
+        defaultName: defaultName
+      };
+    }
+
+    function beginAssemblyCatalogEntryDraft(scope) {
+      const snapshotConfig = buildAssemblyCatalogSnapshot(scope);
+      if (!snapshotConfig || !snapshotConfig.snapshot.parts.length) {
+        return false;
+      }
+
+      assemblyCatalogDraft = {
+        scope: snapshotConfig.scope,
+        snapshot: snapshotConfig.snapshot,
+        partCount: snapshotConfig.partCount,
+        jointCount: snapshotConfig.jointCount,
+        defaultName: snapshotConfig.defaultName || t('catalog.unnamed'),
+        name: snapshotConfig.defaultName || t('catalog.unnamed'),
+        thumbnailDataUrl: captureAssemblyCatalogThumbnailDataUrl(snapshotConfig.snapshot)
+      };
+      refreshAssemblyCatalogWidget();
+      return true;
+    }
+
+    function cancelAssemblyCatalogEntryDraft() {
+      assemblyCatalogDraft = null;
+      refreshAssemblyCatalogWidget();
+    }
+
+    function saveAssemblyCatalogDraft() {
+      if (!assemblyCatalogDraft || !assemblyCatalogDraft.snapshot || !assemblyCatalogDraft.snapshot.parts.length) {
+        return false;
+      }
+
+      const trimmedName = (assemblyCatalogDraft.name || '').trim();
+      const entryName = trimmedName || assemblyCatalogDraft.defaultName || t('catalog.unnamed');
+      const didSave = commitAssemblyCatalogEntries([
+        {
+          id: createAssemblyCatalogEntryId(),
+          name: entryName,
+          scope: assemblyCatalogDraft.scope,
+          savedAt: Date.now(),
+          partCount: assemblyCatalogDraft.partCount,
+          jointCount: assemblyCatalogDraft.jointCount,
+          thumbnailDataUrl: assemblyCatalogDraft.thumbnailDataUrl || captureAssemblyCatalogThumbnailDataUrl(assemblyCatalogDraft.snapshot),
+          snapshot: assemblyCatalogDraft.snapshot
+        }
+      ].concat(savedAssemblyEntries));
+      if (didSave) {
+        assemblyCatalogDraft = null;
+        refreshAssemblyCatalogWidget();
+      }
+      return didSave;
+    }
+
+    function removeAssemblyCatalogEntry(entryId) {
+      return commitAssemblyCatalogEntries(savedAssemblyEntries.filter(function(candidate) {
+        return candidate.id !== entryId;
+      }));
+    }
+
+    function renameAssemblyCatalogEntry(entryId, nextName) {
+      const trimmedName = String(nextName || '').trim();
+      if (!trimmedName) {
+        return false;
+      }
+
+      return updateAssemblyCatalogEntry(entryId, function(entry) {
+        return Object.assign({}, entry, {
+          name: trimmedName
+        });
+      });
+    }
+
+    function createInsertedAssemblyGroupId() {
+      return `group-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    function resolveAssemblyCatalogInsertAnchor(snapshot) {
+      const parts = Array.isArray(snapshot && snapshot.parts) ? snapshot.parts : [];
+      if (!parts.length) {
+        return null;
+      }
+
+      const preferredRootPartId = snapshot.editor && snapshot.editor.rootPartId ? snapshot.editor.rootPartId : null;
+      const rootPart = parts.find(function(part) {
+        return part.id === preferredRootPartId;
+      }) || parts[0];
+      const rootTransform = rootPart && rootPart.transform ? rootPart.transform : null;
+      const rootPosition = rootTransform && Array.isArray(rootTransform.position)
+        ? rootTransform.position
+        : [0, 0, 0];
+
+      return {
+        rootPartId: rootPart.id,
+        offset: [
+          viewport.orb.tx - (rootPosition[0] || 0),
+          0,
+          viewport.orb.tz - (rootPosition[2] || 0)
+        ]
+      };
+    }
+
+    function addAssemblyCatalogEntryToScene(entryId) {
+      const entry = savedAssemblyEntries.find(function(candidate) {
+        return candidate.id === entryId;
+      });
+      if (!entry) {
+        return false;
+      }
+
+      const snapshot = normalizeAssemblyCatalogSnapshot(entry.snapshot);
+      const parts = Array.isArray(snapshot.parts) ? snapshot.parts : [];
+      const joints = Array.isArray(snapshot.joints) ? snapshot.joints : [];
+      if (!parts.length) {
+        return false;
+      }
+
+      const anchor = resolveAssemblyCatalogInsertAnchor(snapshot);
+      if (!anchor) {
+        return false;
+      }
+
+      const previousState = createEditorSnapshot();
+      const partIdMap = new Map();
+      const insertedGroupId = createInsertedAssemblyGroupId();
+      beginCommittedHistoryChange(previousState);
+
+      for (const rawPart of parts) {
+        const rawTransform = rawPart && rawPart.transform ? rawPart.transform : {};
+        const rawPosition = Array.isArray(rawTransform.position) ? rawTransform.position : [0, 0, 0];
+        const rawQuaternion = Array.isArray(rawTransform.quaternion) ? rawTransform.quaternion : [0, 0, 0, 1];
+        const part = assembly.createPart(rawPart.typeId, rawPart.params || {}, {
+          position: [
+            (rawPosition[0] || 0) + anchor.offset[0],
+            rawPosition[1] || 0,
+            (rawPosition[2] || 0) + anchor.offset[2]
+          ],
+          quaternion: rawQuaternion.slice(0, 4)
+        });
+        part.meta = Object.assign({}, rawPart.meta || {}, {
+          groupId: insertedGroupId,
+          groupName: entry.name,
+          sourceAssemblyId: entry.id,
+          sourceAssemblyName: entry.name
+        });
+        partIdMap.set(rawPart.id, part.id);
+        syncPartView(part.id);
+      }
+
+      for (const rawJoint of joints) {
+        const partAId = partIdMap.get(rawJoint.a && rawJoint.a.partId);
+        const partBId = partIdMap.get(rawJoint.b && rawJoint.b.partId);
+        if (!partAId || !partBId) {
+          continue;
+        }
+
+        assembly.connectPorts(
+          { partId: partAId, portId: rawJoint.a.portId },
+          { partId: partBId, portId: rawJoint.b.portId },
+          rawJoint.ruleId,
+          {
+            replaceSource: false,
+            replaceTarget: false,
+            meta: rawJoint.meta || {}
+          }
+        );
+      }
+
+      refreshSceneOverlays();
+      selectPart(partIdMap.get(anchor.rootPartId) || Array.from(partIdMap.values())[0] || null);
+      setModeLabel('SELECT');
+      return true;
     }
 
     function pushHistoryEntry(historyStack, snapshot) {
@@ -982,6 +1523,7 @@
       connectState = null;
       postConnectAdjustState = null;
       previewedPartId = null;
+      previewedPartIds = new Set();
       hoveredJointId = null;
       mode = 'idle';
       clearConnectPreview();
@@ -2326,6 +2868,7 @@
         elements.selectionPanel.style.display = 'none';
         elements.connectButton.disabled = true;
         elements.selectionInfo.innerHTML = '—';
+        refreshAssemblyCatalogWidget();
         if (structureWidget) {
           structureWidget.update(buildStructureWidgetState());
         }
@@ -2351,6 +2894,7 @@
         `X:${position[0].toFixed(0)} Y:${position[1].toFixed(0)} Z:${position[2].toFixed(0)}<br>` +
         `${t('selection.connections')}: <span class="hi">${jointCount}</span><br>` +
         `${t('selection.subassembly')}: <span class="hi">${component.partIds.length}</span>`;
+      refreshAssemblyCatalogWidget();
       if (structureWidget) {
         structureWidget.update(buildStructureWidgetState());
       }
@@ -2451,8 +2995,13 @@
       if (selectedJointId) {
         selectedPartId = null;
       }
-      if (previewedPartId && !getPart(previewedPartId)) {
-        previewedPartId = null;
+      if (previewedPartIds.size) {
+        previewedPartIds = new Set(Array.from(previewedPartIds).filter(function(partId) {
+          return !!getPart(partId);
+        }));
+        previewedPartId = previewedPartIds.size === 1
+          ? Array.from(previewedPartIds)[0]
+          : null;
       }
       if (hoveredJointId && !getJoint(hoveredJointId)) {
         hoveredJointId = null;
@@ -2478,6 +3027,7 @@
       if (modeStatusWidget) {
         modeStatusWidget.update({ text: currentModeLabelText });
       }
+      refreshAssemblyCatalogWidget();
       refreshLayoutControls();
     }
 
@@ -3214,17 +3764,221 @@
     }
 
     function buildStructureWidgetState() {
+      const ungroupedItems = [];
+      const groupedItems = new Map();
+
+      function buildItem(part) {
+        const typeDef = getTypeDef(part);
+        return {
+          id: part.id,
+          label: `${typeDef ? typeDef.label : part.typeId} #${part.id}`,
+          caption: `${t('selection.connections')}: ${assembly.getJointCountForPart(part.id)}`,
+          active: selectedPartId === part.id && !selectedJointId
+        };
+      }
+
+      for (const part of assembly.getParts()) {
+        const item = buildItem(part);
+        const groupInfo = part.meta && part.meta.groupId
+          ? {
+            id: part.meta.groupId,
+            name: part.meta.groupName || t('catalog.unnamed')
+          }
+          : null;
+
+        if (!groupInfo) {
+          ungroupedItems.push(item);
+          continue;
+        }
+
+        if (!groupedItems.has(groupInfo.id)) {
+          groupedItems.set(groupInfo.id, {
+            id: groupInfo.id,
+            name: groupInfo.name,
+            partIds: [],
+            items: []
+          });
+        }
+        groupedItems.get(groupInfo.id).partIds.push(part.id);
+        groupedItems.get(groupInfo.id).items.push(item);
+      }
+
       return {
-        items: assembly.getParts().map(function(part) {
-          const typeDef = getTypeDef(part);
+        ungroupedItems: ungroupedItems,
+        groups: Array.from(groupedItems.values())
+      };
+    }
+
+    function canSaveSelectedAssemblyToCatalog() {
+      return mode === 'idle' && !!getSelectedPart() && !selectedJointId;
+    }
+
+    function canSaveSceneToCatalog() {
+      return mode === 'idle' && assembly.getParts().length > 0;
+    }
+
+    function buildAssemblyCatalogWidgetState() {
+      return {
+        items: savedAssemblyEntries.map(function(entry) {
           return {
-            id: part.id,
-            label: `${typeDef ? typeDef.label : part.typeId} #${part.id}`,
-            caption: `${t('selection.connections')}: ${assembly.getJointCountForPart(part.id)}`,
-            active: selectedPartId === part.id && !selectedJointId
+            id: entry.id,
+            name: entry.name,
+            scope: entry.scope,
+            partCount: entry.partCount,
+            jointCount: entry.jointCount,
+            previewUrl: entry.thumbnailDataUrl || buildAssemblyCatalogPreviewDataUrl(entry)
           };
         })
       };
+    }
+
+    function buildSavedAssembliesWidgetState() {
+      return {
+        note: t('catalog.note'),
+        canSaveSelection: canSaveSelectedAssemblyToCatalog(),
+        canSaveScene: canSaveSceneToCatalog(),
+        items: savedAssemblyEntries.map(function(entry) {
+          return {
+            id: entry.id,
+            name: entry.name,
+            scope: entry.scope,
+            partCount: entry.partCount,
+            jointCount: entry.jointCount
+          };
+        })
+      };
+    }
+
+    function closeAssemblyCatalogDraftModal() {
+      if (typeof assemblyCatalogDraftModalCleanup === 'function') {
+        assemblyCatalogDraftModalCleanup();
+      }
+      assemblyCatalogDraftModalCleanup = null;
+    }
+
+    function refreshAssemblyCatalogDraftModal() {
+      closeAssemblyCatalogDraftModal();
+
+      if (!assemblyCatalogDraft || !overlayManager || typeof overlayManager.getLayerHost !== 'function') {
+        return;
+      }
+
+      const modalHost = overlayManager.getLayerHost('modal');
+      if (!modalHost) {
+        return;
+      }
+
+      const cleanups = [];
+      const backdrop = createWidgetElement('div', 'canvas-layout-catalog-modal-backdrop');
+      const dialog = createWidgetElement('section', 'canvas-layout-widget-surface canvas-layout-catalog-modal');
+      dialog.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', t('catalog.editorTitle')));
+      dialog.appendChild(createWidgetElement('div', 'canvas-layout-widget-note', t('catalog.modalNote')));
+
+      const previewImage = document.createElement('img');
+      previewImage.className = 'canvas-layout-catalog-modal-preview';
+      previewImage.src = assemblyCatalogDraft.thumbnailDataUrl || buildAssemblyCatalogPreviewDataUrl({
+        name: assemblyCatalogDraft.name,
+        scope: assemblyCatalogDraft.scope,
+        partCount: assemblyCatalogDraft.partCount,
+        jointCount: assemblyCatalogDraft.jointCount
+      });
+      previewImage.alt = assemblyCatalogDraft.name || assemblyCatalogDraft.defaultName || t('catalog.unnamed');
+      dialog.appendChild(previewImage);
+
+      const lines = createWidgetElement('div', 'canvas-layout-tab-lines');
+      lines.appendChild(createWidgetElement('div', '', `${t('catalog.scopeLabel')}: ${getAssemblyCatalogScopeLabel(assemblyCatalogDraft.scope)}`));
+      lines.appendChild(createWidgetElement('div', '', `${t('catalog.parts')}: ${assemblyCatalogDraft.partCount}`));
+      lines.appendChild(createWidgetElement('div', '', `${t('selection.connections')}: ${assemblyCatalogDraft.jointCount}`));
+      dialog.appendChild(lines);
+
+      const nameRow = createWidgetElement('label', 'canvas-layout-widget-field-row');
+      nameRow.style.alignItems = 'center';
+      nameRow.appendChild(createWidgetElement('span', 'canvas-layout-widget-field-label', t('catalog.nameLabel')));
+      const nameInput = createWidgetElement('input', 'canvas-layout-widget-number');
+      nameInput.type = 'text';
+      nameInput.value = assemblyCatalogDraft.name || '';
+      nameInput.style.width = '100%';
+      nameInput.style.flex = '1 1 auto';
+      nameRow.appendChild(nameInput);
+      dialog.appendChild(nameRow);
+
+      const actions = createWidgetElement('div', 'canvas-layout-widget-actions');
+      actions.appendChild(createCanvasActionButton({
+        label: t('actions.done'),
+        caption: t('catalog.confirmCaption'),
+        tone: 'success',
+        onClick: function() {
+          saveAssemblyCatalogDraft();
+        }
+      }));
+      actions.appendChild(createCanvasActionButton({
+        label: t('actions.cancel'),
+        caption: t('catalog.cancelCaption'),
+        onClick: function() {
+          cancelAssemblyCatalogEntryDraft();
+        }
+      }));
+      dialog.appendChild(actions);
+
+      backdrop.appendChild(dialog);
+      modalHost.appendChild(backdrop);
+
+      function syncDraftName() {
+        if (!assemblyCatalogDraft) {
+          return;
+        }
+        assemblyCatalogDraft.name = nameInput.value;
+      }
+
+      function handleNameKeydown(event) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          saveAssemblyCatalogDraft();
+          return;
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          cancelAssemblyCatalogEntryDraft();
+        }
+      }
+
+      function handleBackdropClick(event) {
+        if (event.target === backdrop) {
+          cancelAssemblyCatalogEntryDraft();
+        }
+      }
+
+      nameInput.addEventListener('input', syncDraftName);
+      nameInput.addEventListener('keydown', handleNameKeydown);
+      backdrop.addEventListener('click', handleBackdropClick);
+      cleanups.push(function() {
+        nameInput.removeEventListener('input', syncDraftName);
+        nameInput.removeEventListener('keydown', handleNameKeydown);
+        backdrop.removeEventListener('click', handleBackdropClick);
+      });
+
+      requestAnimationFrame(function() {
+        nameInput.focus();
+        nameInput.select();
+      });
+
+      assemblyCatalogDraftModalCleanup = function() {
+        while (cleanups.length) {
+          const cleanup = cleanups.pop();
+          cleanup();
+        }
+        backdrop.remove();
+      };
+    }
+
+    function refreshAssemblyCatalogWidget() {
+      if (assemblyCatalogWidget) {
+        assemblyCatalogWidget.update(buildAssemblyCatalogWidgetState());
+      }
+      if (savedAssembliesWidget) {
+        savedAssembliesWidget.update(buildSavedAssembliesWidgetState());
+      }
+      refreshAssemblyCatalogDraftModal();
     }
 
     function buildSelectedJointWidgetState() {
@@ -3327,15 +4081,15 @@
           const card = createWidgetElement('section', 'canvas-layout-widget-surface');
           card.style.width = '100%';
           card.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', t('widgets.structure')));
-          if (!state || !Array.isArray(state.items) || state.items.length === 0) {
+          const hasUngroupedItems = !!(state && Array.isArray(state.ungroupedItems) && state.ungroupedItems.length);
+          const hasGroups = !!(state && Array.isArray(state.groups) && state.groups.length);
+          if (!hasUngroupedItems && !hasGroups) {
             card.appendChild(createWidgetElement('div', 'canvas-layout-widget-empty', t('widgets.structureEmpty')));
             container.appendChild(card);
             return;
           }
 
-          const actions = createWidgetElement('div', 'canvas-layout-button-stack is-column');
-          actions.style.flexWrap = 'nowrap';
-          for (const item of state.items) {
+          function createStructureButton(item, options) {
             const button = createCanvasActionButton({
               label: item.label,
               caption: item.caption,
@@ -3346,6 +4100,11 @@
               }
             });
             button.style.width = '100%';
+
+            const enablePreview = !options || options.enablePreview !== false;
+            if (!enablePreview) {
+              return button;
+            }
 
             function handleMouseEnter() {
               setPreviewedPart(item.id);
@@ -3366,10 +4125,64 @@
               button.removeEventListener('blur', handleMouseLeave);
             });
 
-            actions.appendChild(button);
+            return button;
           }
 
-          card.appendChild(actions);
+          if (hasUngroupedItems) {
+            const actions = createWidgetElement('div', 'canvas-layout-button-stack is-column');
+            actions.style.flexWrap = 'nowrap';
+            for (const item of state.ungroupedItems) {
+              actions.appendChild(createStructureButton(item));
+            }
+            card.appendChild(actions);
+          }
+
+          if (hasGroups) {
+            const groups = createWidgetElement('div', 'canvas-layout-widget-lines');
+            groups.style.gap = '8px';
+            for (const group of state.groups) {
+              const groupCard = createWidgetElement('section', 'canvas-layout-tab-card');
+              groupCard.style.width = '100%';
+
+              function handleGroupMouseEnter() {
+                setPreviewedParts(group.partIds);
+              }
+
+              function handleGroupMouseLeave() {
+                setPreviewedPart(null);
+              }
+
+              function handleGroupFocusOut(event) {
+                if (groupCard.contains(event.relatedTarget)) {
+                  return;
+                }
+                setPreviewedPart(null);
+              }
+
+              groupCard.addEventListener('mouseenter', handleGroupMouseEnter);
+              groupCard.addEventListener('mouseleave', handleGroupMouseLeave);
+              groupCard.addEventListener('focusin', handleGroupMouseEnter);
+              groupCard.addEventListener('focusout', handleGroupFocusOut);
+              cleanups.push(function() {
+                groupCard.removeEventListener('mouseenter', handleGroupMouseEnter);
+                groupCard.removeEventListener('mouseleave', handleGroupMouseLeave);
+                groupCard.removeEventListener('focusin', handleGroupMouseEnter);
+                groupCard.removeEventListener('focusout', handleGroupFocusOut);
+              });
+
+              groupCard.appendChild(createWidgetElement('div', 'canvas-layout-tab-card-title', group.name));
+              groupCard.appendChild(createWidgetElement('div', 'canvas-layout-widget-note', `${t('catalog.parts')}: ${group.items.length}`));
+              const groupActions = createWidgetElement('div', 'canvas-layout-button-stack is-column');
+              groupActions.style.flexWrap = 'nowrap';
+              for (const item of group.items) {
+                groupActions.appendChild(createStructureButton(item, { enablePreview: false }));
+              }
+              groupCard.appendChild(groupActions);
+              groups.appendChild(groupCard);
+            }
+            card.appendChild(groups);
+          }
+
           container.appendChild(card);
 
           return function() {
@@ -3462,6 +4275,154 @@
           });
           card.appendChild(lines);
           container.appendChild(card);
+        }
+      });
+    }
+
+    function createAssemblyCatalogWidget() {
+      return createDomWidget({
+        widgetType: 'catalog',
+        initialState: buildAssemblyCatalogWidgetState(),
+        render: function(container, state) {
+          container.style.width = '100%';
+          container.style.alignItems = 'stretch';
+
+          if (!state || !Array.isArray(state.items) || state.items.length === 0) {
+            const emptySurface = createWidgetElement('section', 'canvas-layout-widget-surface');
+            emptySurface.style.width = '100%';
+            emptySurface.appendChild(createWidgetElement('div', 'canvas-layout-widget-empty', t('catalog.empty')));
+            container.appendChild(emptySurface);
+            return;
+          }
+
+          const grid = createWidgetElement('div', 'canvas-layout-tab-grid');
+          grid.style.gridTemplateColumns = 'repeat(auto-fill,minmax(220px,240px))';
+          grid.style.justifyContent = 'start';
+          grid.style.width = '100%';
+
+          for (const item of state.items) {
+            const card = createWidgetElement('button', 'canvas-layout-tab-card');
+            card.type = 'button';
+            card.style.textAlign = 'left';
+            card.style.cursor = 'pointer';
+            card.style.width = '100%';
+            card.style.maxWidth = '240px';
+            card.setAttribute('aria-label', `${t('catalog.insertCaption')}: ${item.name}`);
+            const previewImage = document.createElement('img');
+            previewImage.src = item.previewUrl;
+            previewImage.alt = item.name;
+            previewImage.style.width = '100%';
+            previewImage.style.aspectRatio = '16 / 9';
+            previewImage.style.objectFit = 'cover';
+            previewImage.style.borderRadius = '6px';
+            previewImage.style.border = '1px solid #2f3f63';
+            previewImage.style.background = 'rgba(16,21,31,.92)';
+            card.appendChild(previewImage);
+            card.appendChild(createWidgetElement('div', 'canvas-layout-tab-card-title', item.name));
+
+            card.addEventListener('click', function(event) {
+              event.preventDefault();
+              addAssemblyCatalogEntryToScene(item.id);
+            });
+            grid.appendChild(card);
+          }
+
+          container.appendChild(grid);
+        }
+      });
+    }
+
+    function createSavedAssembliesWidget() {
+      return createDomWidget({
+        widgetType: 'saved-assemblies',
+        initialState: buildSavedAssembliesWidgetState(),
+        render: function(container, state) {
+          const cleanups = [];
+          container.style.width = '100%';
+          container.style.alignItems = 'stretch';
+
+          const surface = createWidgetElement('section', 'canvas-layout-widget-surface');
+          surface.style.width = '100%';
+          surface.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', t('widgets.savedAssemblies')));
+          surface.appendChild(createWidgetElement('div', 'canvas-layout-widget-note', state && state.note ? state.note : t('catalog.note')));
+
+          const actions = createWidgetElement('div', 'canvas-layout-widget-actions');
+          actions.appendChild(createCanvasActionButton({
+            label: t('actions.saveSelectionToCatalog'),
+            caption: t('catalog.saveSelectionCaption'),
+            tone: 'accent',
+            disabled: !state || !state.canSaveSelection,
+            onClick: function() {
+              beginAssemblyCatalogEntryDraft('selection');
+            }
+          }));
+          actions.appendChild(createCanvasActionButton({
+            label: t('actions.saveSceneToCatalog'),
+            caption: t('catalog.saveSceneCaption'),
+            disabled: !state || !state.canSaveScene,
+            onClick: function() {
+              beginAssemblyCatalogEntryDraft('scene');
+            }
+          }));
+          surface.appendChild(actions);
+          container.appendChild(surface);
+
+          if (!state || !Array.isArray(state.items) || state.items.length === 0) {
+            const emptySurface = createWidgetElement('section', 'canvas-layout-widget-surface');
+            emptySurface.style.width = '100%';
+            emptySurface.appendChild(createWidgetElement('div', 'canvas-layout-widget-empty', t('catalog.empty')));
+            container.appendChild(emptySurface);
+          } else {
+            const list = createWidgetElement('div', 'canvas-layout-widget-lines');
+            list.style.gap = '8px';
+            for (const item of state.items) {
+              const card = createWidgetElement('section', 'canvas-layout-tab-card');
+              card.style.width = '100%';
+
+              const nameRow = createWidgetElement('label', 'canvas-layout-widget-field-row');
+              nameRow.style.alignItems = 'center';
+              nameRow.appendChild(createWidgetElement('span', 'canvas-layout-widget-field-label', t('catalog.nameLabel')));
+              const nameInput = createWidgetElement('input', 'canvas-layout-widget-number');
+              nameInput.type = 'text';
+              nameInput.value = item.name;
+              nameInput.style.width = '100%';
+              nameInput.style.flex = '1 1 auto';
+              nameRow.appendChild(nameInput);
+              card.appendChild(nameRow);
+
+              const lines = createWidgetElement('div', 'canvas-layout-tab-lines');
+              lines.appendChild(createWidgetElement('div', '', `${t('catalog.scopeLabel')}: ${getAssemblyCatalogScopeLabel(item.scope)}`));
+              lines.appendChild(createWidgetElement('div', '', `${t('catalog.parts')}: ${item.partCount}`));
+              lines.appendChild(createWidgetElement('div', '', `${t('selection.connections')}: ${item.jointCount}`));
+              card.appendChild(lines);
+
+              const row = createWidgetElement('div', 'canvas-layout-widget-actions');
+              row.appendChild(createCanvasActionButton({
+                label: t('actions.renameCatalogEntry'),
+                caption: t('catalog.renameCaption'),
+                onClick: function() {
+                  renameAssemblyCatalogEntry(item.id, nameInput.value);
+                }
+              }));
+              row.appendChild(createCanvasActionButton({
+                label: t('actions.removeFromCatalog'),
+                caption: t('catalog.removeCaption'),
+                onClick: function() {
+                  removeAssemblyCatalogEntry(item.id);
+                }
+              }));
+              card.appendChild(row);
+              list.appendChild(card);
+            }
+            container.appendChild(list);
+          }
+
+          return function() {
+            while (cleanups.length) {
+              const cleanup = cleanups.pop();
+              cleanup();
+            }
+          };
         }
       });
     }
@@ -3629,6 +4590,11 @@
             id: 'joint',
             label: t('widgets.joint'),
             renderContent: mountPanelWidget(selectedJointWidget)
+          },
+          {
+            id: 'saved-assemblies',
+            label: t('widgets.savedAssemblies'),
+            renderContent: mountPanelWidget(savedAssembliesWidget)
           }
         ],
         iconRailItems: [
@@ -3662,9 +4628,36 @@
             }
           }
         ],
+        secondaryIconRailItems: [
+          {
+            icon: '◫',
+            label: t('actions.saveSelectionToCatalog'),
+            getDisabled: function() {
+              return !canSaveSelectedAssemblyToCatalog();
+            },
+            onClick: function() {
+              beginAssemblyCatalogEntryDraft('selection');
+            }
+          },
+          {
+            icon: '▣',
+            label: t('actions.saveSceneToCatalog'),
+            getDisabled: function() {
+              return !canSaveSceneToCatalog();
+            },
+            onClick: function() {
+              beginAssemblyCatalogEntryDraft('scene');
+            }
+          }
+        ],
         centerWidgets: [modeStatusWidget, snapStatusWidget, interactionStatusWidget],
         rightBottomWidgets: [viewCube],
         bottomTabs: [
+          {
+            id: 'catalog',
+            label: t('widgets.catalog'),
+            renderContent: mountPanelWidget(assemblyCatalogWidget)
+          },
           {
             id: 'help',
             label: t('widgets.hints'),
@@ -3678,7 +4671,7 @@
     function applyLocaleToUi() {
       syncStaticUiText();
       connectStrategyPanel.sync();
-      if (addPartWidget && structureWidget && selectedPartWidget && selectedJointWidget) {
+      if (addPartWidget && structureWidget && selectedPartWidget && selectedJointWidget && assemblyCatalogWidget && savedAssembliesWidget) {
         mountCanvasLayoutPrototype();
       }
       updateConnectDebugUi();
@@ -3725,6 +4718,8 @@
     structureWidget = createStructureWidget();
     selectedPartWidget = createSelectedPartWidget();
     selectedJointWidget = createSelectedJointWidget();
+    assemblyCatalogWidget = createAssemblyCatalogWidget();
+    savedAssembliesWidget = createSavedAssembliesWidget();
     snapStatusWidget = createSnapStatusWidget();
     modeStatusWidget = createModeStatusWidget();
     interactionStatusWidget = createInteractionStatusWidget();
@@ -3740,6 +4735,7 @@
     structureWidget.update(buildStructureWidgetState());
     selectedPartWidget.update(buildSelectedPartWidgetState());
     selectedJointWidget.update(buildSelectedJointWidgetState());
+    refreshAssemblyCatalogWidget();
     modeStatusWidget.update({ text: currentModeLabelText });
     snapStatusWidget.update({ active: snapBadgeActive });
     interactionStatusWidget.update({ html: interactionHudMarkup });
