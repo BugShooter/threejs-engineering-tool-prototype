@@ -5128,6 +5128,12 @@
         return;
       }
 
+      if (mode === 'postConnectAdjust') {
+        clearPendingPick();
+        event.preventDefault();
+        return;
+      }
+
       clearPendingPick();
 
       const hoveredJointCandidateId = resolveHoveredJointId(event.clientX, event.clientY);
@@ -5477,6 +5483,7 @@
       }
 
       if (mode === 'postConnectAdjust') {
+        clearPendingPick();
         if (event.button === 0) {
           finishPostConnectAdjust({ commit: true });
         }
