@@ -1036,18 +1036,68 @@
         return false;
       }
 
-      const snapshot = buildRigidComponentSnapshot(part.id);
-      return getConnectSourceCandidates(snapshot, part.id).length > 0;
+      const connectScope = buildConnectScope(part.id, [part.id]);
+      return !!connectScope && connectScope.sourceCandidates.length > 0;
     }
 
-    function getConnectSourceCandidates(snapshot, rootPartId) {
+    function canConnectStructure(component, preferredRootPartId) {
+      if (!component || !Array.isArray(component.partIds) || !component.partIds.length) {
+        return false;
+      }
+
+      const rootPartId = component.partIds.indexOf(preferredRootPartId) !== -1
+        ? preferredRootPartId
+        : component.partIds[0];
+      const connectScope = buildConnectScope(rootPartId, component.partIds);
+      return !!connectScope && connectScope.sourceCandidates.length > 0;
+    }
+
+    function normalizeConnectSourcePartIds(sourcePartIds, fallbackRootPartId) {
+      let partIds = [];
+      if (sourcePartIds instanceof Set) {
+        partIds = Array.from(sourcePartIds);
+      } else if (Array.isArray(sourcePartIds)) {
+        partIds = sourcePartIds.slice();
+      } else if (sourcePartIds) {
+        partIds = [sourcePartIds];
+      }
+
+      const filteredPartIds = Array.from(new Set(partIds.filter(Boolean)));
+      if (!filteredPartIds.length && fallbackRootPartId) {
+        filteredPartIds.push(fallbackRootPartId);
+      }
+      return filteredPartIds;
+    }
+
+    function buildConnectScope(rootPartId, sourcePartIds) {
+      if (!rootPartId) {
+        return null;
+      }
+
+      const snapshot = buildRigidComponentSnapshot(rootPartId);
+      if (!snapshot) {
+        return null;
+      }
+
+      const normalizedPartIds = normalizeConnectSourcePartIds(sourcePartIds, rootPartId);
+      return {
+        rootPartId,
+        snapshot,
+        sourcePartIds: normalizedPartIds,
+        sourceCandidates: getConnectSourceCandidates(snapshot, normalizedPartIds)
+      };
+    }
+
+    function getConnectSourceCandidates(snapshot, sourcePartIds) {
       if (!snapshot) {
         return [];
       }
 
+      const sourcePartIdSet = new Set(normalizeConnectSourcePartIds(sourcePartIds, snapshot.rootPartId));
+
       return (snapshot.sourcePorts || [])
         .filter(function(port) {
-          return port.partId === rootPartId && port.snapSource !== false;
+          return sourcePartIdSet.has(port.partId) && port.snapSource !== false;
         })
         .filter(function(port) {
           return assembly.getPortConnectionCount(port.partId, port.portId) < port.capacity;
@@ -1114,6 +1164,16 @@
 
     function getSelectedStructurePartIdSet() {
       return new Set(getSelectedStructurePartIds());
+    }
+
+    function getSelectedConnectScope() {
+      const part = getSelectedPart();
+      if (!part) {
+        return null;
+      }
+
+      const structureComponent = getSelectedStructureComponent();
+      return buildConnectScope(part.id, structureComponent ? structureComponent.partIds : [part.id]);
     }
 
     function refreshPartViews(partIds) {
@@ -1984,8 +2044,12 @@
         }
 
         const typeDef = getTypeDef(part);
+        const structureScopeActive = Array.isArray(connectState.sourcePartIds) && connectState.sourcePartIds.length > 1;
+        const title = structureScopeActive
+          ? `${t('selection.subassembly')} · ${connectState.sourcePartIds.length}`
+          : `${typeDef.label} #${part.id}`;
         showInteractionHud(
-          `<div class="ttl">${typeDef.label} #${part.id}</div>` +
+          `<div class="ttl">${title}</div>` +
           createHudField(t('hud.mode'), t('modes.connect')) +
           createHudField(t('hud.step'), t('hud.chooseSourcePort')) +
           createHudField(t('hud.available'), connectState.sourceCandidates.length)
@@ -2001,6 +2065,10 @@
         }
 
         const typeDef = getTypeDef(part);
+        const structureScopeActive = Array.isArray(connectState.sourcePartIds) && connectState.sourcePartIds.length > 1;
+        const title = structureScopeActive
+          ? `${t('selection.subassembly')} · ${connectState.sourcePartIds.length}`
+          : `${typeDef.label} #${part.id}`;
         const variantCount = connectState.activeTargetSnapVariants ? connectState.activeTargetSnapVariants.length : 0;
         const variantLine = variantCount > 1
           ? createHudField(t('hud.orientation'), `${connectState.activeTargetVariantIndex + 1}/${variantCount}`)
@@ -2011,9 +2079,12 @@
         const targetLine = connectState.activeTarget
           ? createHudField(t('hud.target'), `${connectState.activeTarget.port.partId} · ${connectState.activeTarget.port.portId}`)
           : createHudField(t('hud.target'), t('hud.hoverPort'));
+        const sourceLabel = structureScopeActive
+          ? `${connectState.sourcePort.partId} · ${connectState.sourcePort.portId}`
+          : connectState.sourcePort.portId;
         showInteractionHud(
-          `<div class="ttl">${typeDef.label} #${part.id}</div>` +
-          createHudField(t('hud.source'), connectState.sourcePort.portId) +
+          `<div class="ttl">${title}</div>` +
+          createHudField(t('hud.source'), sourceLabel) +
           `${targetLine}` +
           `${variantLine}` +
           `${variantHintLine}` +
@@ -2622,22 +2693,21 @@
     }
 
     function beginConnectMode() {
-      const part = getSelectedPart();
-      if (!part) {
+      const connectScope = getSelectedConnectScope();
+      if (!connectScope) {
         return;
       }
 
-      const snapshot = buildRigidComponentSnapshot(part.id);
-      const sourceCandidates = getConnectSourceCandidates(snapshot, part.id);
-      if (!sourceCandidates.length) {
+      if (!connectScope.sourceCandidates.length) {
         setModeLabel('NO SOURCE PORT');
         return;
       }
 
       connectState = {
-        rootPartId: part.id,
-        snapshot,
-        sourceCandidates,
+        rootPartId: connectScope.rootPartId,
+        snapshot: connectScope.snapshot,
+        sourcePartIds: connectScope.sourcePartIds.slice(),
+        sourceCandidates: connectScope.sourceCandidates,
         activeSourceKey: null,
         sourcePort: null,
         targetCandidates: [],
@@ -2652,7 +2722,7 @@
       };
       mode = 'connectSource';
       clearConnectPreview();
-      preview.updatePortCandidates(sourceCandidates, null);
+      preview.updatePortCandidates(connectScope.sourceCandidates, null);
       updateInteractionHud();
       refreshGizmo();
       refreshCallouts();
@@ -2843,6 +2913,7 @@
       if (structureComponent) {
         const rootPart = getSelectedPart();
         const typeDef = rootPart ? getTypeDef(rootPart) : null;
+        const canConnectStructureSelection = canConnectStructure(structureComponent, rootPart ? rootPart.id : null);
 
         return {
           getAnchorScreen: function() {
@@ -2868,17 +2939,28 @@
           onClose: closeSelectionCallout,
           closeTooltip: t('callout.closeCallout'),
           lines: [
-            rootPart && typeDef ? `${t('common.selected')}: ${typeDef.label} #${rootPart.id}` : `${t('common.selected')}: ${t('common.dash')}`,
+            rootPart && typeDef ? `${t('legacy.sections.selected')}: ${typeDef.label} #${rootPart.id}` : `${t('legacy.sections.selected')}: ${t('common.dash')}`,
             `${t('catalog.parts')}: ${structureComponent.partIds.length}`,
             `${t('selection.connections')}: ${structureComponent.joints.length}`
           ],
           actions: [
             {
+              icon: '⊕',
+              tooltip: canConnectStructureSelection ? t('callout.explicitConnectMode') : t('callout.noFreeSourcePort'),
+              disabled: !canConnectStructureSelection,
+              onClick: beginConnectMode
+            },
+            {
+              icon: '▣',
+              tooltip: t('callout.openProperties'),
+              active: isPanelTabActive('left-sandbox-tabs', 'properties'),
+              onClick: openSelectedStructureProperties
+            },
+            {
               icon: '◌',
               tooltip: t('callout.selectSinglePart'),
               onClick: function() {
-                if (rootPart) {
-                  selectPart(rootPart.id);
+                if (selectSinglePartOnly(rootPart ? rootPart.id : null)) {
                   setModeLabel('SELECT');
                 }
               }
@@ -3188,6 +3270,11 @@
       if (!part || selectedJointId || areInspectorPanelsSuppressed()) {
         elements.selectionPanel.style.display = 'none';
         elements.connectButton.disabled = true;
+        elements.disconnectButton.disabled = true;
+        elements.disconnectButton.style.display = '';
+        elements.deleteButton.disabled = true;
+        setButtonLabel(elements.disconnectButton, '⇄', t('actions.disconnect'));
+        setButtonLabel(elements.deleteButton, '✕', t('actions.delete'));
         elements.selectionInfo.innerHTML = '—';
         refreshAssemblyCatalogWidget();
         if (structureWidget) {
@@ -3202,17 +3289,42 @@
       const label = getTypeDef(part).label;
       const position = part.transform.position;
       const jointCount = assembly.getJointCountForPart(part.id);
+      const structureSelected = isSelectedStructureActive();
+      const structureConnectScope = structureSelected ? buildConnectScope(part.id, component.partIds) : null;
+      const canConnectSelection = structureSelected
+        ? !!structureConnectScope && structureConnectScope.sourceCandidates.length > 0
+        : canConnectPart(part);
       const extra = part.typeId === 'profile-20x20'
         ? `<br>${t('selection.length')}: <span class="hi">${formatMillimeters(part.params.length)}</span>`
         : '';
 
       elements.selectionPanel.style.display = 'flex';
-      elements.connectButton.disabled = !canConnectPart(part);
-      elements.selectionInfo.innerHTML =
-        `<span class="hi">${label} #${part.id}</span>${extra}<br>` +
-        `X:${position[0].toFixed(0)} Y:${position[1].toFixed(0)} Z:${position[2].toFixed(0)}<br>` +
-        `${t('selection.connections')}: <span class="hi">${jointCount}</span><br>` +
-        `${t('selection.subassembly')}: <span class="hi">${component.partIds.length}</span>`;
+      elements.connectButton.disabled = !canConnectSelection;
+
+      if (structureSelected) {
+        const availableSourceCount = structureConnectScope ? structureConnectScope.sourceCandidates.length : 0;
+        elements.disconnectButton.disabled = true;
+        elements.disconnectButton.style.display = 'none';
+        elements.deleteButton.disabled = component.partIds.length === 0;
+        setButtonLabel(elements.deleteButton, '✕', t('actions.deleteStructure'));
+        elements.selectionInfo.innerHTML =
+          `<span class="hi">${t('selection.subassembly')} · ${component.partIds.length}</span><br>` +
+          `${t('legacy.sections.selected')}: <span class="hi">${label} #${part.id}</span><br>` +
+          `${t('selection.connections')}: <span class="hi">${component.joints.length}</span><br>` +
+          `${t('hud.available')}: <span class="hi">${availableSourceCount}</span>`;
+      } else {
+        elements.disconnectButton.style.display = '';
+        elements.disconnectButton.disabled = jointCount === 0;
+        elements.deleteButton.disabled = false;
+        setButtonLabel(elements.disconnectButton, '⇄', t('actions.disconnect'));
+        setButtonLabel(elements.deleteButton, '✕', t('actions.delete'));
+        elements.selectionInfo.innerHTML =
+          `<span class="hi">${label} #${part.id}</span>${extra}<br>` +
+          `X:${position[0].toFixed(0)} Y:${position[1].toFixed(0)} Z:${position[2].toFixed(0)}<br>` +
+          `${t('selection.connections')}: <span class="hi">${jointCount}</span><br>` +
+          `${t('selection.subassembly')}: <span class="hi">${component.partIds.length}</span>`;
+      }
+
       refreshAssemblyCatalogWidget();
       if (structureWidget) {
         structureWidget.update(buildStructureWidgetState());
@@ -4119,7 +4231,7 @@
       }
 
       const candidate = connectState.sourceCandidates.find(function(entry) {
-        return entry && entry.port && entry.port.portId === portId;
+        return entry && entry.port && entry.port.partId === part.id && entry.port.portId === portId;
       });
       if (!candidate) {
         return false;
@@ -4212,6 +4324,26 @@
       return true;
     }
 
+    function openSelectedStructureProperties() {
+      if (!getSelectedStructureComponent()) {
+        return false;
+      }
+
+      activatePanelTab('left-sandbox-tabs', 'properties');
+      return true;
+    }
+
+    function selectSinglePartOnly(partId) {
+      const targetPart = partId ? getPart(partId) : getSelectedPart();
+      if (!targetPart) {
+        return false;
+      }
+
+      clearSelectedStructureState();
+      selectPart(targetPart.id);
+      return true;
+    }
+
     function openSelectedProfileLengthEditor(partId) {
       const targetPart = partId ? getPart(partId) : getSelectedPart();
       if (!targetPart || targetPart.typeId !== 'profile-20x20') {
@@ -4235,6 +4367,9 @@
       const position = part.transform.position;
       const jointCount = assembly.getJointCountForPart(part.id);
       const structureSelected = isSelectedStructureActive();
+      const canConnect = structureSelected
+        ? canConnectStructure(component, part.id)
+        : canConnectPart(part);
 
       return {
         title: `${typeDef.label} #${part.id}`,
@@ -4249,7 +4384,7 @@
             label: t('actions.connect'),
             caption: t('widgets.choosePortCaption'),
             tone: 'accent',
-            disabled: !canConnectPart(part),
+            disabled: !canConnect,
             onClick: beginConnectMode
           },
           {
@@ -4608,48 +4743,60 @@
       };
     }
 
-    function buildPartPropertyPortItems(part) {
-      if (!part) {
-        return [];
-      }
+    function buildPropertyPortItems(parts, options) {
+      const config = Object.assign({ includePartLabel: false }, options || {});
+      const items = [];
 
-      const typeDef = getTypeDef(part);
-      return resolvePartPorts(part, typeDef).map(function(port) {
-        const joints = getPartPortJoints(part.id, port.portId);
-        const primaryJoint = joints[0] || null;
-        const linkedPartId = primaryJoint
-          ? (primaryJoint.a.partId === part.id ? primaryJoint.b.partId : primaryJoint.a.partId)
-          : null;
-        const linkedPart = linkedPartId ? getPart(linkedPartId) : null;
-        const isSourcePort = port.kind === 'fixed' && port.snapSource !== false;
-        const canStartConnect = isSourcePort && assembly.getPortConnectionCount(part.id, port.portId) < port.capacity;
-        const captionParts = [];
-
-        if (joints.length) {
-          captionParts.push(`${t('selection.connections')}: ${joints.length}`);
-          if (linkedPart) {
-            captionParts.push(`${getPartTypeLabel(getTypeDef(linkedPart))} #${linkedPart.id}`);
-          }
-        } else {
-          captionParts.push(canStartConnect ? t('widgets.portReady') : t('widgets.portPassive'));
+      for (const part of Array.isArray(parts) ? parts : []) {
+        if (!part) {
+          continue;
         }
 
-        return {
-          label: port.portId,
-          caption: captionParts.join(' · '),
-          tone: joints.length ? 'accent' : null,
-          disabled: !joints.length && !canStartConnect,
-          previewPartId: linkedPartId,
-          onClick: function() {
-            if (primaryJoint) {
-              setSelectedJoint(primaryJoint.id);
-              setModeLabel('JOINT');
-              return;
+        const typeDef = getTypeDef(part);
+        const partLabel = `${getPartTypeLabel(typeDef)} #${part.id}`;
+        for (const port of resolvePartPorts(part, typeDef)) {
+          const joints = getPartPortJoints(part.id, port.portId);
+          const primaryJoint = joints[0] || null;
+          const linkedPartId = primaryJoint
+            ? (primaryJoint.a.partId === part.id ? primaryJoint.b.partId : primaryJoint.a.partId)
+            : null;
+          const linkedPart = linkedPartId ? getPart(linkedPartId) : null;
+          const isSourcePort = port.kind === 'fixed' && port.snapSource !== false;
+          const canStartConnect = isSourcePort && assembly.getPortConnectionCount(part.id, port.portId) < port.capacity;
+          const captionParts = [];
+
+          if (joints.length) {
+            captionParts.push(`${t('selection.connections')}: ${joints.length}`);
+            if (linkedPart) {
+              captionParts.push(`${getPartTypeLabel(getTypeDef(linkedPart))} #${linkedPart.id}`);
             }
-            activateConnectSourcePort(part.id, port.portId);
+          } else {
+            captionParts.push(canStartConnect ? t('widgets.portReady') : t('widgets.portPassive'));
           }
-        };
-      });
+
+          items.push({
+            label: config.includePartLabel ? `${partLabel} · ${port.portId}` : port.portId,
+            caption: captionParts.join(' · '),
+            tone: joints.length ? 'accent' : null,
+            disabled: !joints.length && !canStartConnect,
+            previewPartId: linkedPartId,
+            onClick: function() {
+              if (primaryJoint) {
+                setSelectedJoint(primaryJoint.id);
+                setModeLabel('JOINT');
+                return;
+              }
+              activateConnectSourcePort(part.id, port.portId);
+            }
+          });
+        }
+      }
+
+      return items;
+    }
+
+    function buildPartPropertyPortItems(part) {
+      return buildPropertyPortItems(part ? [part] : [], { includePartLabel: false });
     }
 
     function buildJointPropertyPartItems(joint) {
@@ -4675,6 +4822,89 @@
       });
     }
 
+    function buildStructurePropertyPortItems(component) {
+      if (!component || !Array.isArray(component.parts)) {
+        return [];
+      }
+
+      return buildPropertyPortItems(component.parts, { includePartLabel: true });
+    }
+
+    function buildStructurePropertyPartItems(component, rootPartId) {
+      if (!component || !Array.isArray(component.parts)) {
+        return [];
+      }
+
+      return component.parts.map(function(part) {
+        const typeDef = getTypeDef(part);
+        const captionParts = [];
+        if (part.typeId === 'profile-20x20') {
+          captionParts.push(`${t('selection.length')}: ${formatMillimeters(part.params.length)}`);
+        }
+        captionParts.push(`${t('selection.connections')}: ${assembly.getJointCountForPart(part.id)}`);
+
+        return {
+          label: `${typeDef.label} #${part.id}`,
+          caption: captionParts.join(' · '),
+          tone: part.id === rootPartId ? 'accent' : null,
+          previewPartId: part.id,
+          onClick: function() {
+            if (selectSinglePartOnly(part.id)) {
+              activatePanelTab('left-sandbox-tabs', 'properties');
+              setModeLabel('SELECT');
+            }
+          }
+        };
+      });
+    }
+
+    function buildSelectedStructurePropertiesState(component, rootPart) {
+      if (!component || !rootPart) {
+        return {
+          empty: t('widgets.propertiesEmpty')
+        };
+      }
+
+      const typeDef = getTypeDef(rootPart);
+      const connectScope = buildConnectScope(rootPart.id, component.partIds);
+      const availableSourceCount = connectScope ? connectScope.sourceCandidates.length : 0;
+
+      return {
+        title: `${t('selection.subassembly')} · ${component.partIds.length}`,
+        lines: [
+          `${t('legacy.sections.selected')}: ${typeDef.label} #${rootPart.id}`,
+          `${t('catalog.parts')}: ${component.partIds.length}`,
+          `${t('selection.connections')}: ${component.joints.length}`,
+          `${t('hud.available')}: ${availableSourceCount}`
+        ],
+        actions: [
+          {
+            label: t('actions.connect'),
+            caption: t('widgets.choosePortCaption'),
+            tone: 'accent',
+            disabled: availableSourceCount === 0,
+            onClick: beginConnectMode
+          },
+          {
+            label: t('actions.deleteStructure'),
+            caption: t('widgets.deleteStructureCaption'),
+            disabled: component.partIds.length === 0,
+            onClick: deleteSelectedStructure
+          }
+        ],
+        sections: [
+          {
+            title: t('widgets.propertiesPorts'),
+            items: buildStructurePropertyPortItems(component)
+          },
+          {
+            title: t('widgets.propertiesLinkedParts'),
+            items: buildStructurePropertyPartItems(component, rootPart.id)
+          }
+        ]
+      };
+    }
+
     function buildPropertiesWidgetState() {
       if (areInspectorPanelsSuppressed()) {
         return {
@@ -4696,6 +4926,12 @@
             }
           ]
         };
+      }
+
+      const structureComponent = getSelectedStructureComponent();
+      const structureRootPart = getSelectedPart();
+      if (structureComponent && structureRootPart) {
+        return buildSelectedStructurePropertiesState(structureComponent, structureRootPart);
       }
 
       const part = getSelectedPart();
