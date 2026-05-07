@@ -41,8 +41,9 @@
       '.canvas-layout-flow{display:flex;min-width:0;min-height:0;width:100%;height:100%;pointer-events:none;}',
       '.canvas-layout-flow.is-vertical{flex-direction:column;}',
       '.canvas-layout-flow.is-horizontal{flex-direction:row;}',
-      '.canvas-layout-flow[data-layout-id="left-panel-row"]>.canvas-layout-tab-mount{flex:1 1 auto;min-width:0;}',
-      '.canvas-layout-flow[data-layout-id="left-icon-rail-row"]{width:max-content;flex:0 0 auto;height:auto;}',
+      '.canvas-layout-flow[data-layout-id="left-panel-row"]{width:max-content;max-width:100%;height:100%;align-items:stretch;}',
+      '.canvas-layout-flow[data-layout-id="left-panel-row"]>.canvas-layout-tab-mount{flex:0 0 auto;min-width:0;height:100%;}',
+      '.canvas-layout-flow[data-layout-id="left-icon-rail-row"]{width:max-content;flex:0 0 auto;height:auto;align-self:flex-start;}',
       '.canvas-layout-slot{display:grid;min-width:0;min-height:0;pointer-events:none;}',
       '.canvas-layout-slot.is-overlay-host{position:relative;overflow:visible;}',
       '.canvas-layout-slot>*{min-width:0;min-height:0;pointer-events:none;}',
@@ -98,7 +99,8 @@
       '.canvas-layout-tab-panel.is-slot-constrained .canvas-layout-tab-shell{max-height:100%;}',
       '.canvas-layout-tab-panel.is-fill-height .canvas-layout-tab-shell{height:100%;}',
       '.canvas-layout-tab-strip{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 8px 6px 8px;min-width:0;}',
-      '.canvas-layout-tab-list-viewport{display:flex;flex:1 1 auto;min-width:0;min-height:0;overflow:hidden;}',
+      '.canvas-layout-tab-list-viewport{display:flex;flex:1 1 auto;min-width:0;min-height:0;overflow:hidden;scrollbar-width:none;-ms-overflow-style:none;}',
+      '.canvas-layout-tab-list-viewport::-webkit-scrollbar{display:none;}',
       '.canvas-layout-tab-list{display:flex;flex:1 1 auto;gap:6px;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none;scroll-behavior:smooth;}',
       '.canvas-layout-tab-list::-webkit-scrollbar{display:none;}',
       '.canvas-layout-tab-actions{display:flex;flex:0 0 auto;gap:4px;}',
@@ -122,7 +124,7 @@
       '.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed{width:max-content;}',
       '.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-shell{width:max-content;height:100%;}',
       '.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-strip{width:max-content;height:100%;flex-direction:column;align-items:stretch;}',
-      '.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-list-viewport{max-height:100%;overflow-y:auto;overflow-x:hidden;}',
+      '.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-list-viewport{height:100%;max-height:100%;overflow-y:auto;overflow-x:hidden;}',
       '.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-button{flex:0 0 auto;writing-mode:vertical-rl;text-orientation:mixed;justify-content:center;border-right:none;border-bottom:1px solid #324264;min-width:30px;min-height:84px;padding:7px 4px;white-space:normal;}',
       '.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-button:last-child{border-bottom:none;}',
       '.canvas-layout-tab-content{display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0;padding:0 8px 7px 8px;overflow:auto;}',
@@ -187,7 +189,7 @@
       '.canvas-layout-edge-drawer-handle{position:absolute;top:-1px;right:-1px;bottom:-1px;width:var(--drawer-handle-size,32px);display:flex;align-items:center;justify-content:center;padding:10px 4px;border:1px solid #324264;border-left:none;border-radius:0 10px 10px 0;background:rgba(20,27,40,.98);color:#dce6ff;font-family:"JetBrains Mono",monospace;font-size:8px;letter-spacing:.08em;text-transform:uppercase;writing-mode:vertical-rl;text-orientation:mixed;cursor:pointer;transition:border-color .12s,background .12s,transform .12s,opacity .12s;pointer-events:auto;opacity:.96;}',
       '.canvas-layout-edge-drawer-handle:hover{border-color:#67a6ff;background:rgba(29,38,55,.98);}',
       '@media (max-width: 1180px){.canvas-layout-prototype,.canvas-layout-prototype-modal-host{--canvas-layout-system-inset:14px;}.canvas-layout-flow[data-layout-id="top-row"]{padding-right:0 !important;}.canvas-layout-tab-panel[data-dock="left"]:not(.is-collapsed){min-width:300px;}.canvas-layout-tab-panel[data-dock="left"] .canvas-layout-tab-content{min-width:240px;}.canvas-layout-button{min-width:104px;}}',
-      '@media (max-width: 900px){.canvas-layout-prototype,.canvas-layout-prototype-modal-host{--canvas-layout-system-inset:12px;}.canvas-layout-prototype-stage{overflow:auto;}.canvas-layout-flow.is-horizontal>.canvas-layout-slot{flex:0 0 auto !important;}.canvas-layout-flow.is-horizontal{flex-direction:column;}.canvas-layout-flow[data-layout-id="left-panel-row"],.canvas-layout-flow[data-layout-id="left-icon-rail-row"]{flex-direction:row !important;}.canvas-layout-slot{justify-items:stretch !important;}.canvas-layout-card,.canvas-layout-tab-panel[data-dock="left"] .canvas-layout-tab-content{max-width:none;}.canvas-layout-tab-panel[data-dock="left"]:not(.is-collapsed){min-width:300px;}.canvas-layout-tab-panel[data-dock="bottom"] .canvas-layout-tab-content{min-height:96px;}.canvas-layout-tab-panel.is-fill-height,.canvas-layout-tab-panel.is-fill-height .canvas-layout-tab-shell{height:auto;}.canvas-layout-tab-panel.is-fill-height .canvas-layout-tab-content{flex:0 0 auto;}.canvas-layout-tab-panel.is-collapsed .canvas-layout-tab-list{flex-wrap:wrap;}.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-list{flex-wrap:nowrap;}}'
+      '@media (max-width: 900px){.canvas-layout-prototype,.canvas-layout-prototype-modal-host{--canvas-layout-system-inset:12px;}.canvas-layout-prototype-stage{overflow:auto;}.canvas-layout-flow.is-horizontal>.canvas-layout-slot{flex:0 0 auto !important;}.canvas-layout-flow.is-horizontal{flex-direction:column;}.canvas-layout-flow[data-layout-id="left-panel-row"],.canvas-layout-flow[data-layout-id="left-icon-rail-row"]{flex-direction:row !important;}.canvas-layout-slot{justify-items:stretch !important;}.canvas-layout-card,.canvas-layout-tab-panel[data-dock="left"] .canvas-layout-tab-content{max-width:none;}.canvas-layout-tab-panel[data-dock="left"]:not(.is-collapsed){min-width:300px;}.canvas-layout-tab-panel[data-dock="bottom"] .canvas-layout-tab-content{min-height:96px;}.canvas-layout-tab-panel.is-fill-height,.canvas-layout-tab-panel.is-fill-height .canvas-layout-tab-shell{height:auto;}.canvas-layout-tab-panel.is-fill-height .canvas-layout-tab-content{flex:0 0 auto;}.canvas-layout-tab-panel.is-collapsed .canvas-layout-tab-list{flex-wrap:wrap;}.canvas-layout-tab-panel[data-collapse-mode="vertical-tabs"].is-collapsed .canvas-layout-tab-list{flex-wrap:nowrap;}.canvas-layout-flow[data-layout-id="left-panel-row"]{width:max-content;height:100%;}}'
     ].join('');
     document.head.appendChild(style);
   }
@@ -280,6 +282,7 @@
       ? config.secondaryIconRailItems
       : [];
     const centerWidgets = Array.isArray(config.centerWidgets) ? config.centerWidgets.filter(Boolean) : [];
+    const topRightCollapsed = !!config.topRightCollapsed;
     const topRightTabs = Array.isArray(config.topRightTabs) && config.topRightTabs.length
       ? config.topRightTabs
       : [
@@ -391,7 +394,7 @@
                 grow: 1,
                 basis: '380px',
                 alignX: 'left',
-                alignY: 'top',
+                alignY: 'stretch',
                 overlayChildren: leftCellOverlays,
                 content: {
                   type: 'layout',
@@ -399,7 +402,7 @@
                   direction: 'horizontal',
                   gap: 10,
                   style: {
-                    alignItems: 'flex-start'
+                    alignItems: 'stretch'
                   },
                   children: [
                     {
@@ -506,6 +509,7 @@
                             type: 'tabs',
                             id: 'top-right-control-tabs',
                             dock: 'top',
+                            collapsed: topRightCollapsed,
                             constrainHeightToSlot: true,
                             style: {
                               width: '336px'
@@ -540,6 +544,7 @@
                       type: 'tabs',
                       id: 'top-right-control-tabs',
                       dock: 'top',
+                      collapsed: topRightCollapsed,
                       style: {
                         width: '336px',
                         marginLeft: 'auto'
@@ -847,29 +852,28 @@
     };
     let activeContentCleanup = null;
 
+    function setActiveTab(nextTabId, options) {
+      const tabId = typeof nextTabId === 'string' && nextTabId ? nextTabId : null;
+      const hasTab = (config.tabs || []).some(function(tab) {
+        return tab.id === tabId;
+      });
+      if (!hasTab) {
+        return false;
+      }
+
+      const nextCollapsed = (!options || options.expand !== false) ? false : state.collapsed;
+      if (state.activeTabId === tabId && state.collapsed === nextCollapsed) {
+        return true;
+      }
+
+      state.activeTabId = tabId;
+      state.collapsed = nextCollapsed;
+      render();
+      return true;
+    }
+
     function useCollapsedVerticalTabs() {
       return config.collapseMode === 'vertical-tabs' && state.collapsed;
-    }
-
-    function getLayoutSystemInset() {
-      const layoutRoot = mount.closest('.canvas-layout-prototype, .canvas-layout-prototype-modal-host');
-      if (!layoutRoot) {
-        return 0;
-      }
-
-      const rawInset = getComputedStyle(layoutRoot).getPropertyValue('--canvas-layout-system-inset');
-      const parsedInset = parseFloat(rawInset);
-      return Number.isFinite(parsedInset) ? parsedInset : 0;
-    }
-
-    function getCollapsedVerticalAvailableHeight() {
-      if (!mount.isConnected) {
-        return null;
-      }
-
-      const mountRect = mount.getBoundingClientRect();
-      const availableHeight = Math.floor(window.innerHeight - mountRect.top - getLayoutSystemInset());
-      return Math.max(96, availableHeight);
     }
 
     function getTabScrollStep() {
@@ -880,6 +884,22 @@
 
     function getTabScrollContainer() {
       return useCollapsedVerticalTabs() ? tabListViewport : tabList;
+    }
+
+    function getCollapsedVerticalConstraintHeight() {
+      const parentSlot = mount.parentElement && typeof mount.parentElement.closest === 'function'
+        ? mount.parentElement.closest('.canvas-layout-slot')
+        : null;
+      const constraintNode = parentSlot && parentSlot.parentElement
+        ? parentSlot.parentElement
+        : parentSlot;
+
+      if (!constraintNode || typeof constraintNode.getBoundingClientRect !== 'function') {
+        return 0;
+      }
+
+      const rect = constraintNode.getBoundingClientRect();
+      return rect && rect.height > 0 ? rect.height : 0;
     }
 
     function syncTabScrollAxis() {
@@ -956,12 +976,13 @@
 
     function syncMountSizing() {
       if (useCollapsedVerticalTabs()) {
-        const availableHeight = (config.constrainHeightToSlot || config.fillHeight)
-          ? getCollapsedVerticalAvailableHeight()
-          : null;
+        const constrainedHeight = (config.constrainHeightToSlot || config.fillHeight)
+          ? getCollapsedVerticalConstraintHeight()
+          : 0;
+        const heightValue = constrainedHeight > 0 ? `${constrainedHeight}px` : '100%';
         mount.style.width = 'max-content';
-        mount.style.height = availableHeight ? `${availableHeight}px` : 'max-content';
-        mount.style.maxHeight = availableHeight ? `${availableHeight}px` : '';
+        mount.style.height = (config.constrainHeightToSlot || config.fillHeight) ? heightValue : 'max-content';
+        mount.style.maxHeight = (config.constrainHeightToSlot || config.fillHeight) ? heightValue : '';
         mount.style.flex = '0 0 auto';
         return;
       }
@@ -1153,11 +1174,7 @@
         }
         button.addEventListener('click', function(event) {
           event.preventDefault();
-          state.activeTabId = tab.id;
-          if (state.collapsed) {
-            state.collapsed = false;
-          }
-          render();
+          setActiveTab(tab.id);
         });
         tabList.appendChild(button);
       });
@@ -1167,6 +1184,20 @@
           activeButton.scrollIntoView({ block: 'nearest', inline: 'nearest' });
         } else if (!state.collapsed) {
           activeButton.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+      }
+
+      if (config.id && environment && environment.tabPanels) {
+        environment.tabPanels[config.id] = {
+          activateTab: setActiveTab,
+          getActiveTabId: function() {
+            return state.activeTabId;
+          }
+        };
+        if (environment.cleanups) {
+          environment.cleanups.push(function() {
+            delete environment.tabPanels[config.id];
+          });
         }
       }
     }
@@ -1560,7 +1591,8 @@
       cleanups: cleanups,
       anchors: {},
       edgeHost: edgeHost,
-      root: root
+      root: root,
+      tabPanels: {}
     };
 
     stage.appendChild(renderNode(buildDemoLayoutConfig(config), environment));
@@ -1573,6 +1605,20 @@
 
     return {
       root: root,
+      activateTab: function(panelId, tabId, options) {
+        const panel = environment.tabPanels[panelId];
+        if (!panel || typeof panel.activateTab !== 'function') {
+          return false;
+        }
+        return panel.activateTab(tabId, options);
+      },
+      getActiveTabId: function(panelId) {
+        const panel = environment.tabPanels[panelId];
+        if (!panel || typeof panel.getActiveTabId !== 'function') {
+          return null;
+        }
+        return panel.getActiveTabId();
+      },
       refresh: function() {
         root.querySelectorAll('.canvas-layout-icon-rail').forEach(function(rail) {
           if (typeof rail.__refreshState === 'function') {

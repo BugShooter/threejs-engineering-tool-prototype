@@ -246,8 +246,7 @@
     let interactionHudMarkup = '';
     let addPartWidget = null;
     let structureWidget = null;
-    let selectedPartWidget = null;
-    let selectedJointWidget = null;
+    let propertiesWidget = null;
     let snapStatusWidget = null;
     let modeStatusWidget = null;
     let interactionStatusWidget = null;
@@ -777,6 +776,20 @@
         addPartWidget.update({ length: profileLengthValue });
       }
       return profileLengthValue;
+    }
+
+    function activatePanelTab(panelId, tabId, options) {
+      if (!canvasLayoutPrototype || typeof canvasLayoutPrototype.activateTab !== 'function') {
+        return false;
+      }
+      return canvasLayoutPrototype.activateTab(panelId, tabId, options);
+    }
+
+    function isPanelTabActive(panelId, tabId) {
+      if (!canvasLayoutPrototype || typeof canvasLayoutPrototype.getActiveTabId !== 'function') {
+        return false;
+      }
+      return canvasLayoutPrototype.getActiveTabId(panelId) === tabId;
     }
 
     function getPortKey(port) {
@@ -1350,6 +1363,19 @@
       });
     }
 
+    function createEmptyEditorSnapshot(options) {
+      const config = Object.assign({ camera: null }, options || {});
+      return {
+        parts: [],
+        joints: [],
+        editor: {
+          selectedPartId: null,
+          selectedJointId: null,
+          camera: config.camera
+        }
+      };
+    }
+
     function createEditorSnapshotKey(snapshot) {
       return JSON.stringify(snapshot);
     }
@@ -1732,6 +1758,7 @@
       gizmo.clearInteractionState();
 
       const result = assembly.load(snapshot);
+      selectedStructureActive = false;
       selectedPartId = result.editor.selectedPartId && getPart(result.editor.selectedPartId)
         ? result.editor.selectedPartId
         : null;
@@ -2838,6 +2865,8 @@
             return getPartsScreenRect(structureComponent.partIds, 52);
           },
           title: `${t('selection.subassembly')} · ${structureComponent.partIds.length}`,
+          onClose: closeSelectionCallout,
+          closeTooltip: t('callout.closeCallout'),
           lines: [
             rootPart && typeDef ? `${t('common.selected')}: ${typeDef.label} #${rootPart.id}` : `${t('common.selected')}: ${t('common.dash')}`,
             `${t('catalog.parts')}: ${structureComponent.partIds.length}`,
@@ -2855,7 +2884,7 @@
               }
             },
             {
-              icon: '✕',
+              icon: '🗑',
               tooltip: t('callout.deleteSelectedStructure'),
               danger: true,
               onClick: deleteSelectedStructure
@@ -2875,11 +2904,12 @@
       const partId = part.id;
       const typeDef = getTypeDef(part);
       const component = assembly.getConnectedComponent(part.id);
+      const isProfile = part.typeId === 'profile-20x20';
       const lines = [
         `${t('callout.position')}: ${part.transform.position[0].toFixed(0)}, ${part.transform.position[1].toFixed(0)}, ${part.transform.position[2].toFixed(0)}`,
         `${t('selection.connections')}: ${assembly.getJointCountForPart(part.id)}`
       ];
-      if (part.typeId === 'profile-20x20') {
+      if (isProfile) {
         lines.unshift(`${t('selection.length')}: ${formatMillimeters(part.params.length)}`);
       }
 
@@ -2904,6 +2934,8 @@
           return getPartScreenRect(partId, 52);
         },
         title: `${typeDef.label} #${part.id}`,
+        onClose: closeSelectionCallout,
+        closeTooltip: t('callout.closeCallout'),
         lines,
         actions: [
           {
@@ -2932,6 +2964,14 @@
             onClick: function() { setGizmoMode('length'); }
           },
           {
+            icon: '▣',
+            tooltip: t('callout.openProperties'),
+            active: isPanelTabActive('left-sandbox-tabs', 'properties'),
+            onClick: function() {
+              openSelectedPartProperties(part.id, { focusLength: isProfile });
+            }
+          },
+          {
             icon: '◫',
             tooltip: t('callout.selectConnectedStructure'),
             disabled: component.partIds.length < 2,
@@ -2948,7 +2988,7 @@
             onClick: disconnectSelectedPart
           },
           {
-            icon: '✕',
+            icon: '🗑',
             tooltip: t('callout.deleteSelectedPart'),
             danger: true,
             onClick: deleteSelected
@@ -2998,6 +3038,10 @@
           return getJointScreenRect(joint.id, 34);
         },
         title: t('callout.adjustConnectionTitle'),
+        onClose: function() {
+          finishPostConnectAdjust({ commit: false });
+        },
+        closeTooltip: t('callout.closeCallout'),
         lines: [
           `${t('callout.side')}: ${postConnectAdjustState.sideLabel || t('common.dash')}`,
           rootPart ? `${getTypeDef(rootPart).label} #${rootPart.id}` : postConnectAdjustState.rootPartLabel,
@@ -3075,6 +3119,10 @@
           return getJointScreenRect(joint.id, 28);
         },
         title: t('callout.connectionTitle', { id: joint.id }),
+        onClose: function() {
+          closeSelectionCallout();
+        },
+        closeTooltip: t('callout.closeCallout'),
         lines: [
           `${partA ? getTypeDef(partA).label : joint.a.partId} · ${joint.a.portId}`,
           `${partB ? getTypeDef(partB).label : joint.b.partId} · ${joint.b.portId}`,
@@ -3100,6 +3148,14 @@
             }
           };
         }).concat([
+          {
+            icon: '▣',
+            tooltip: t('callout.openProperties'),
+            active: isPanelTabActive('left-sandbox-tabs', 'properties'),
+            onClick: function() {
+              activatePanelTab('left-sandbox-tabs', 'properties');
+            }
+          },
           {
             icon: '⟂',
             label: t('callout.split'),
@@ -3137,9 +3193,7 @@
         if (structureWidget) {
           structureWidget.update(buildStructureWidgetState());
         }
-        if (selectedPartWidget) {
-          selectedPartWidget.update(buildSelectedPartWidgetState());
-        }
+        refreshPropertiesWidget();
         refreshCallouts();
         return;
       }
@@ -3163,9 +3217,7 @@
       if (structureWidget) {
         structureWidget.update(buildStructureWidgetState());
       }
-      if (selectedPartWidget) {
-        selectedPartWidget.update(buildSelectedPartWidgetState());
-      }
+      refreshPropertiesWidget();
       refreshCallouts();
     }
 
@@ -3177,9 +3229,7 @@
         if (structureWidget) {
           structureWidget.update(buildStructureWidgetState());
         }
-        if (selectedJointWidget) {
-          selectedJointWidget.update(buildSelectedJointWidgetState());
-        }
+        refreshPropertiesWidget();
         refreshCallouts();
         return;
       }
@@ -3198,9 +3248,7 @@
       if (structureWidget) {
         structureWidget.update(buildStructureWidgetState());
       }
-      if (selectedJointWidget) {
-        selectedJointWidget.update(buildSelectedJointWidgetState());
-      }
+      refreshPropertiesWidget();
       refreshCallouts();
     }
 
@@ -3247,7 +3295,13 @@
     }
 
     function deselectAll() {
+      clearSelectedStructureState();
       selectPart(null);
+    }
+
+    function closeSelectionCallout() {
+      deselectAll();
+      setModeLabel('—');
     }
 
     function syncAllPartViews() {
@@ -3669,6 +3723,7 @@
       syncPartView(part.id);
       refreshSceneOverlays();
       selectPart(part.id);
+      return part;
     }
 
     function addConnector(typeId) {
@@ -3680,6 +3735,7 @@
       syncPartView(part.id);
       refreshSceneOverlays();
       selectPart(part.id);
+      return part;
     }
 
     function deleteSelected() {
@@ -3697,6 +3753,18 @@
       updateSelectionInfo();
       updateJointInfo();
       refreshGizmo();
+      refreshCallouts();
+    }
+
+    function deleteCurrentSelection() {
+      if (selectedJointId) {
+        return false;
+      }
+      if (isSelectedStructureActive()) {
+        return deleteSelectedStructure();
+      }
+      deleteSelected();
+      return true;
     }
 
     function deleteSelectedStructure() {
@@ -3719,6 +3787,21 @@
       updateJointInfo();
       refreshGizmo();
       refreshCallouts();
+      return true;
+    }
+
+    function clearSceneWithConfirmation() {
+      if (!canClearScene()) {
+        return false;
+      }
+
+      if (!window.confirm(t('dialogs.clearSceneConfirm'))) {
+        return false;
+      }
+
+      beginCommittedHistoryChange();
+      applyEditorSnapshot(createEmptyEditorSnapshot({ camera: viewport.getCameraState() }));
+      setModeLabel('—');
       return true;
     }
 
@@ -4009,6 +4092,136 @@
       };
     }
 
+    function getPartPortJoints(partId, portId) {
+      return assembly.getPartJoints(partId).filter(function(joint) {
+        const matchesA = joint.a.partId === partId && joint.a.portId === portId;
+        const matchesB = joint.b.partId === partId && joint.b.portId === portId;
+        return matchesA || matchesB;
+      });
+    }
+
+    function activateConnectSourcePort(partId, portId) {
+      const part = getPart(partId);
+      if (!part) {
+        return false;
+      }
+
+      if (selectedPartId !== part.id || selectedJointId) {
+        selectPart(part.id);
+      }
+      if (mode !== 'idle') {
+        return false;
+      }
+
+      beginConnectMode();
+      if (!connectState || !Array.isArray(connectState.sourceCandidates)) {
+        return false;
+      }
+
+      const candidate = connectState.sourceCandidates.find(function(entry) {
+        return entry && entry.port && entry.port.portId === portId;
+      });
+      if (!candidate) {
+        return false;
+      }
+
+      beginConnectTargetPhase(candidate.key);
+      refreshGizmo();
+      refreshCallouts();
+      return true;
+    }
+
+    function getProfileLengthEditConfig(part) {
+      if (!part || part.typeId !== 'profile-20x20') {
+        return {
+          mode: 'disabled',
+          reason: t('reasons.resizeOnlyProfile')
+        };
+      }
+
+      const handles = getResizeHandlesConfig(part);
+      if (handles[1].enabled && handles[1].hasAnchor) {
+        return { mode: 'anchored', sign: 1 };
+      }
+      if (handles['-1'].enabled && handles['-1'].hasAnchor) {
+        return { mode: 'anchored', sign: -1 };
+      }
+      if (handles[1].enabled || handles['-1'].enabled) {
+        return { mode: 'centered' };
+      }
+
+      return {
+        mode: 'disabled',
+        reason: handles[1].reason || handles['-1'].reason || t('reasons.resizeFreeEndOnly')
+      };
+    }
+
+    function applyProfileLengthFromProperties(partId, value) {
+      const part = getPart(partId);
+      if (!part || part.typeId !== 'profile-20x20') {
+        return false;
+      }
+
+      const nextLength = clampProfileLength(value);
+      if (Math.abs(nextLength - Number(part.params.length || 0)) < 0.001) {
+        return true;
+      }
+
+      const editConfig = getProfileLengthEditConfig(part);
+      if (editConfig.mode === 'disabled') {
+        return false;
+      }
+
+      beginCommittedHistoryChange();
+      if (editConfig.mode === 'anchored') {
+        const position = getPartPositionVector(part);
+        const quaternion = getPartQuaternion(part);
+        const axis = new THREE.Vector3(1, 0, 0).applyQuaternion(quaternion).normalize();
+        const fixedEnd = position.clone().addScaledVector(axis, -editConfig.sign * Number(part.params.length || 0) / 2);
+        const center = fixedEnd.clone().addScaledVector(axis, editConfig.sign * nextLength / 2);
+        assembly.updatePartParam(part.id, 'length', nextLength);
+        assembly.setPartTransform(part.id, center, quaternion);
+        syncPartView(part.id);
+      } else {
+        assembly.updatePartParam(part.id, 'length', nextLength);
+        syncPartView(part.id);
+      }
+
+      refreshSceneOverlays();
+      updateSelectionInfo();
+      updateJointInfo();
+      refreshGizmo();
+      refreshCallouts();
+      return true;
+    }
+
+    function openSelectedPartProperties(partId, options) {
+      const config = Object.assign({ focusLength: false }, options || {});
+      const targetPart = partId ? getPart(partId) : getSelectedPart();
+      if (!targetPart) {
+        return false;
+      }
+
+      if (selectedPartId !== targetPart.id || selectedJointId) {
+        selectPart(targetPart.id);
+      }
+      activatePanelTab('left-sandbox-tabs', 'properties');
+      if (config.focusLength && targetPart.typeId === 'profile-20x20' && propertiesWidget && typeof propertiesWidget.focusLengthInput === 'function') {
+        propertiesWidget.focusLengthInput();
+      }
+      return true;
+    }
+
+    function openSelectedProfileLengthEditor(partId) {
+      const targetPart = partId ? getPart(partId) : getSelectedPart();
+      if (!targetPart || targetPart.typeId !== 'profile-20x20') {
+        return false;
+      }
+
+      openSelectedPartProperties(targetPart.id, { focusLength: true });
+      return true;
+    }
+
     function buildSelectedPartWidgetState() {
       const part = getSelectedPart();
       if (!part || selectedJointId || areInspectorPanelsSuppressed()) {
@@ -4119,6 +4332,10 @@
     }
 
     function canSaveSceneToCatalog() {
+      return mode === 'idle' && assembly.getParts().length > 0;
+    }
+
+    function canClearScene() {
       return mode === 'idle' && assembly.getParts().length > 0;
     }
 
@@ -4355,6 +4572,12 @@
       refreshAssemblyCatalogModal();
     }
 
+    function refreshPropertiesWidget() {
+      if (propertiesWidget) {
+        propertiesWidget.update(buildPropertiesWidgetState());
+      }
+    }
+
     function buildSelectedJointWidgetState() {
       const joint = getSelectedJoint();
       if (!joint || areInspectorPanelsSuppressed()) {
@@ -4385,58 +4608,282 @@
       };
     }
 
+    function buildPartPropertyPortItems(part) {
+      if (!part) {
+        return [];
+      }
+
+      const typeDef = getTypeDef(part);
+      return resolvePartPorts(part, typeDef).map(function(port) {
+        const joints = getPartPortJoints(part.id, port.portId);
+        const primaryJoint = joints[0] || null;
+        const linkedPartId = primaryJoint
+          ? (primaryJoint.a.partId === part.id ? primaryJoint.b.partId : primaryJoint.a.partId)
+          : null;
+        const linkedPart = linkedPartId ? getPart(linkedPartId) : null;
+        const isSourcePort = port.kind === 'fixed' && port.snapSource !== false;
+        const canStartConnect = isSourcePort && assembly.getPortConnectionCount(part.id, port.portId) < port.capacity;
+        const captionParts = [];
+
+        if (joints.length) {
+          captionParts.push(`${t('selection.connections')}: ${joints.length}`);
+          if (linkedPart) {
+            captionParts.push(`${getPartTypeLabel(getTypeDef(linkedPart))} #${linkedPart.id}`);
+          }
+        } else {
+          captionParts.push(canStartConnect ? t('widgets.portReady') : t('widgets.portPassive'));
+        }
+
+        return {
+          label: port.portId,
+          caption: captionParts.join(' · '),
+          tone: joints.length ? 'accent' : null,
+          disabled: !joints.length && !canStartConnect,
+          previewPartId: linkedPartId,
+          onClick: function() {
+            if (primaryJoint) {
+              setSelectedJoint(primaryJoint.id);
+              setModeLabel('JOINT');
+              return;
+            }
+            activateConnectSourcePort(part.id, port.portId);
+          }
+        };
+      });
+    }
+
+    function buildJointPropertyPartItems(joint) {
+      if (!joint) {
+        return [];
+      }
+
+      return [joint.a, joint.b].map(function(side) {
+        const part = getPart(side.partId);
+        const label = part
+          ? `${getPartTypeLabel(getTypeDef(part))} #${part.id}`
+          : side.partId;
+
+        return {
+          label: label,
+          caption: side.portId,
+          previewPartId: side.partId,
+          onClick: function() {
+            selectPart(side.partId);
+            setModeLabel('SELECT');
+          }
+        };
+      });
+    }
+
+    function buildPropertiesWidgetState() {
+      if (areInspectorPanelsSuppressed()) {
+        return {
+          empty: t('widgets.propertiesEmpty')
+        };
+      }
+
+      const joint = getSelectedJoint();
+      if (joint) {
+        const jointState = buildSelectedJointWidgetState();
+        return {
+          title: jointState.title,
+          lines: jointState.lines,
+          actions: jointState.actions,
+          sections: [
+            {
+              title: t('widgets.propertiesLinkedParts'),
+              items: buildJointPropertyPartItems(joint)
+            }
+          ]
+        };
+      }
+
+      const part = getSelectedPart();
+      if (part) {
+        const partState = buildSelectedPartWidgetState();
+        const lengthEditorConfig = part.typeId === 'profile-20x20'
+          ? getProfileLengthEditConfig(part)
+          : null;
+        return {
+          partId: part.id,
+          title: partState.title,
+          lines: partState.lines,
+          actions: partState.actions,
+          lengthEditor: lengthEditorConfig
+            ? {
+                label: t('legacy.fields.length'),
+                value: clampProfileLength(part.params.length),
+                disabled: lengthEditorConfig.mode === 'disabled',
+                note: lengthEditorConfig.mode === 'disabled' ? lengthEditorConfig.reason : ''
+              }
+            : null,
+          sections: [
+            {
+              title: t('widgets.propertiesPorts'),
+              items: buildPartPropertyPortItems(part)
+            }
+          ]
+        };
+      }
+
+      return {
+        empty: t('widgets.propertiesEmpty')
+      };
+    }
+
     function createAddPartWidget() {
+      const previewCache = {};
+
+      function createPartPreviewSnapshot(typeId, params) {
+        return {
+          parts: [
+            {
+              id: 'preview-part',
+              typeId: typeId,
+              params: catalog.normalizeParams(typeId, params || {}),
+              transform: {
+                position: [0, PROFILE_SIZE / 2, 0],
+                quaternion: [0, 0, 0, 1]
+              },
+              meta: {}
+            }
+          ],
+          joints: []
+        };
+      }
+
+      function getPartPreviewUrl(typeId, params) {
+        const cacheKey = `${typeId}:${JSON.stringify(catalog.normalizeParams(typeId, params || {}))}`;
+        if (!previewCache[cacheKey]) {
+          previewCache[cacheKey] = captureAssemblyCatalogThumbnailDataUrl(createPartPreviewSnapshot(typeId, params));
+        }
+        return previewCache[cacheKey];
+      }
+
       return createDomWidget({
         widgetType: 'control',
         initialState: { length: profileLengthValue },
         render: function(container, state) {
-          const card = createWidgetElement('section', 'canvas-layout-widget-surface');
-          card.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', t('widgets.add')));
+          container.style.width = '100%';
+          container.style.alignItems = 'stretch';
 
-          const row = createWidgetElement('label', 'canvas-layout-widget-field-row');
-          row.appendChild(createWidgetElement('span', 'canvas-layout-widget-field-label', t('legacy.fields.length')));
-          const input = createWidgetElement('input', 'canvas-layout-widget-number');
-          input.type = 'number';
-          input.min = '40';
-          input.max = '800';
-          input.step = '10';
-          input.value = `${clampProfileLength(state && state.length)}`;
-          row.appendChild(input);
-          row.appendChild(createWidgetElement('span', 'canvas-layout-widget-field-label', t('common.mm')));
-          card.appendChild(row);
-
-          const actions = createWidgetElement('div', 'canvas-layout-widget-actions');
-          actions.appendChild(createCanvasActionButton({
-            label: t('actions.profile'),
-            caption: t('partTypes.profile20x20'),
-            tone: 'accent',
-            onClick: addProfile
-          }));
-          actions.appendChild(createCanvasActionButton({
-            label: t('actions.angle'),
-            caption: t('partTypes.connectorAngle20'),
-            onClick: function() {
-              addConnector('connector-angle-20');
+          const defaultProfileLength = clampProfileLength(state && state.length);
+          const items = [
+            {
+              id: 'profile-20x20',
+              title: t('actions.profile'),
+              lines: [
+                t('partTypes.profile20x20'),
+                `${t('selection.length')}: ${formatMillimeters(defaultProfileLength)}`
+              ],
+              previewUrl: getPartPreviewUrl('profile-20x20', { length: defaultProfileLength }),
+              onAdd: addProfile,
+              onAddAndEdit: function() {
+                const part = addProfile();
+                if (part) {
+                  openSelectedProfileLengthEditor(part.id);
+                }
+              }
+            },
+            {
+              id: 'connector-angle-20',
+              title: t('actions.angle'),
+              lines: [t('partTypes.connectorAngle20')],
+              previewUrl: getPartPreviewUrl('connector-angle-20', {}),
+              onAdd: function() {
+                addConnector('connector-angle-20');
+              }
+            },
+            {
+              id: 'connector-straight-20',
+              title: t('actions.straight'),
+              lines: [t('partTypes.connectorStraight20')],
+              previewUrl: getPartPreviewUrl('connector-straight-20', {}),
+              onAdd: function() {
+                addConnector('connector-straight-20');
+              }
             }
-          }));
-          actions.appendChild(createCanvasActionButton({
-            label: t('actions.straight'),
-            caption: t('partTypes.connectorStraight20'),
-            onClick: function() {
-              addConnector('connector-straight-20');
-            }
-          }));
-          card.appendChild(actions);
-          container.appendChild(card);
+          ];
 
-          function handleInput() {
-            syncProfileLength(input.value, { updateWidget: false });
+          const grid = createWidgetElement('div', 'canvas-layout-tab-grid');
+          grid.style.gridTemplateColumns = 'repeat(auto-fill,minmax(220px,240px))';
+          grid.style.justifyContent = 'start';
+          grid.style.width = '100%';
+
+          for (const item of items) {
+            const card = createWidgetElement('section', 'canvas-layout-tab-card');
+            card.style.width = '100%';
+            card.style.maxWidth = '240px';
+            card.style.position = 'relative';
+
+            const addButton = document.createElement('button');
+            addButton.type = 'button';
+            addButton.style.display = 'flex';
+            addButton.style.flexDirection = 'column';
+            addButton.style.gap = '6px';
+            addButton.style.width = '100%';
+            addButton.style.padding = '0';
+            addButton.style.border = 'none';
+            addButton.style.background = 'transparent';
+            addButton.style.color = 'inherit';
+            addButton.style.cursor = 'pointer';
+            addButton.style.textAlign = 'left';
+            addButton.setAttribute('aria-label', item.title);
+
+            const previewImage = document.createElement('img');
+            previewImage.src = item.previewUrl;
+            previewImage.alt = item.title;
+            previewImage.style.width = '100%';
+            previewImage.style.aspectRatio = '16 / 9';
+            previewImage.style.objectFit = 'cover';
+            previewImage.style.borderRadius = '6px';
+            previewImage.style.border = '1px solid #2f3f63';
+            previewImage.style.background = 'rgba(16,21,31,.92)';
+            addButton.appendChild(previewImage);
+            addButton.appendChild(createWidgetElement('div', 'canvas-layout-tab-card-title', item.title));
+
+            const lines = createWidgetElement('div', 'canvas-layout-tab-lines');
+            for (const line of item.lines || []) {
+              lines.appendChild(createWidgetElement('div', '', line));
+            }
+            addButton.appendChild(lines);
+
+            addButton.addEventListener('click', function(event) {
+              event.preventDefault();
+              item.onAdd();
+            });
+            card.appendChild(addButton);
+
+            if (typeof item.onAddAndEdit === 'function') {
+              const quickEditButton = document.createElement('button');
+              quickEditButton.type = 'button';
+              quickEditButton.textContent = '✎';
+              quickEditButton.title = t('actions.addAndEditLength');
+              quickEditButton.setAttribute('aria-label', t('actions.addAndEditLength'));
+              quickEditButton.style.position = 'absolute';
+              quickEditButton.style.top = '12px';
+              quickEditButton.style.right = '12px';
+              quickEditButton.style.width = '28px';
+              quickEditButton.style.height = '28px';
+              quickEditButton.style.border = '1px solid #4d74b6';
+              quickEditButton.style.borderRadius = '999px';
+              quickEditButton.style.background = 'rgba(11,16,25,.94)';
+              quickEditButton.style.color = '#dce6ff';
+              quickEditButton.style.cursor = 'pointer';
+              quickEditButton.style.fontFamily = 'JetBrains Mono, monospace';
+              quickEditButton.style.fontSize = '12px';
+              quickEditButton.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                item.onAddAndEdit();
+              });
+              card.appendChild(quickEditButton);
+            }
+
+            grid.appendChild(card);
           }
 
-          input.addEventListener('input', handleInput);
-          return function() {
-            input.removeEventListener('input', handleInput);
-          };
+          container.appendChild(grid);
         }
       });
     }
@@ -4570,13 +5017,21 @@
       });
     }
 
-    function createSelectedPartWidget() {
-      return createDomWidget({
+    function createPropertiesWidget() {
+      let lengthInput = null;
+      let shouldFocusLengthInput = false;
+
+      const widget = createDomWidget({
         widgetType: 'inspector',
-        initialState: buildSelectedPartWidgetState(),
+        initialState: buildPropertiesWidgetState(),
         render: function(container, state) {
+          const cleanups = [];
+          container.style.width = '100%';
+          container.style.alignItems = 'stretch';
+
           const card = createWidgetElement('section', 'canvas-layout-widget-surface');
-          card.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', t('widgets.part')));
+          card.style.width = '100%';
+          card.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', t('widgets.properties')));
           if (!state || state.empty) {
             card.appendChild(createWidgetElement('div', 'canvas-layout-widget-empty', state && state.empty ? state.empty : t('widgets.noData')));
             container.appendChild(card);
@@ -4584,50 +5039,140 @@
           }
 
           card.appendChild(createWidgetElement('div', 'canvas-layout-widget-note', state.title));
+
+          if (state.lengthEditor) {
+            const row = createWidgetElement('label', 'canvas-layout-widget-field-row');
+            row.style.alignItems = 'center';
+            row.appendChild(createWidgetElement('span', 'canvas-layout-widget-field-label', state.lengthEditor.label));
+
+            const input = createWidgetElement('input', 'canvas-layout-widget-number');
+            input.type = 'number';
+            input.min = '40';
+            input.max = '800';
+            input.step = '10';
+            input.value = `${clampProfileLength(state.lengthEditor.value)}`;
+            input.style.width = '88px';
+            if (state.lengthEditor.disabled) {
+              input.disabled = true;
+            }
+            row.appendChild(input);
+            row.appendChild(createWidgetElement('span', 'canvas-layout-widget-field-label', t('common.mm')));
+            card.appendChild(row);
+
+            if (state.lengthEditor.note) {
+              card.appendChild(createWidgetElement('div', 'canvas-layout-widget-note', state.lengthEditor.note));
+            }
+
+            function applyLengthChange() {
+              applyProfileLengthFromProperties(state.partId, input.value);
+            }
+
+            function handleKeydown(event) {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                applyLengthChange();
+                input.blur();
+              }
+            }
+
+            input.addEventListener('change', applyLengthChange);
+            input.addEventListener('keydown', handleKeydown);
+            cleanups.push(function() {
+              input.removeEventListener('change', applyLengthChange);
+              input.removeEventListener('keydown', handleKeydown);
+            });
+
+            lengthInput = input;
+            if (shouldFocusLengthInput && !input.disabled) {
+              requestAnimationFrame(function() {
+                if (lengthInput === input) {
+                  input.focus();
+                  input.select();
+                  shouldFocusLengthInput = false;
+                }
+              });
+            }
+          } else {
+            lengthInput = null;
+          }
+
           const lines = createWidgetElement('div', 'canvas-layout-widget-lines');
           for (const line of state.lines || []) {
             lines.appendChild(createWidgetElement('div', '', line));
           }
           card.appendChild(lines);
 
-          const actions = createWidgetElement('div', 'canvas-layout-widget-actions');
-          for (const action of state.actions || []) {
-            actions.appendChild(createCanvasActionButton(action));
+          for (const section of state.sections || []) {
+            card.appendChild(createWidgetElement('div', 'canvas-layout-section-label', section.title));
+
+            if (!Array.isArray(section.items) || !section.items.length) {
+              card.appendChild(createWidgetElement('div', 'canvas-layout-widget-note', t('widgets.noData')));
+              continue;
+            }
+
+            const sectionActions = createWidgetElement('div', 'canvas-layout-button-stack is-column');
+            sectionActions.style.flexWrap = 'nowrap';
+            for (const item of section.items) {
+              const button = createCanvasActionButton(item);
+              button.style.width = '100%';
+              if (item.previewPartId) {
+                function handlePreviewStart() {
+                  setPreviewedPart(item.previewPartId);
+                }
+
+                function handlePreviewEnd() {
+                  setPreviewedPart(null);
+                }
+
+                button.addEventListener('mouseenter', handlePreviewStart);
+                button.addEventListener('mouseleave', handlePreviewEnd);
+                button.addEventListener('focus', handlePreviewStart);
+                button.addEventListener('blur', handlePreviewEnd);
+                cleanups.push(function() {
+                  button.removeEventListener('mouseenter', handlePreviewStart);
+                  button.removeEventListener('mouseleave', handlePreviewEnd);
+                  button.removeEventListener('focus', handlePreviewStart);
+                  button.removeEventListener('blur', handlePreviewEnd);
+                });
+              }
+              sectionActions.appendChild(button);
+            }
+            card.appendChild(sectionActions);
           }
-          card.appendChild(actions);
+
+          if (Array.isArray(state.actions) && state.actions.length) {
+            const actions = createWidgetElement('div', 'canvas-layout-widget-actions');
+            for (const action of state.actions) {
+              actions.appendChild(createCanvasActionButton(action));
+            }
+            card.appendChild(actions);
+          }
+
           container.appendChild(card);
+
+          return function() {
+            lengthInput = null;
+            setPreviewedPart(null);
+            while (cleanups.length) {
+              const cleanup = cleanups.pop();
+              cleanup();
+            }
+          };
         }
       });
-    }
 
-    function createSelectedJointWidget() {
-      return createDomWidget({
-        widgetType: 'inspector',
-        initialState: buildSelectedJointWidgetState(),
-        render: function(container, state) {
-          const card = createWidgetElement('section', 'canvas-layout-widget-surface');
-          card.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', t('widgets.joint')));
-          if (!state || state.empty) {
-            card.appendChild(createWidgetElement('div', 'canvas-layout-widget-empty', state && state.empty ? state.empty : t('widgets.noData')));
-            container.appendChild(card);
-            return;
-          }
-
-          card.appendChild(createWidgetElement('div', 'canvas-layout-widget-note', state.title));
-          const lines = createWidgetElement('div', 'canvas-layout-widget-lines');
-          for (const line of state.lines || []) {
-            lines.appendChild(createWidgetElement('div', '', line));
-          }
-          card.appendChild(lines);
-
-          const actions = createWidgetElement('div', 'canvas-layout-widget-actions');
-          for (const action of state.actions || []) {
-            actions.appendChild(createCanvasActionButton(action));
-          }
-          card.appendChild(actions);
-          container.appendChild(card);
+      widget.focusLengthInput = function() {
+        shouldFocusLengthInput = true;
+        if (lengthInput && !lengthInput.disabled) {
+          lengthInput.focus();
+          lengthInput.select();
+          shouldFocusLengthInput = false;
+          return true;
         }
-      });
+        return false;
+      };
+
+      return widget;
     }
 
     function createHintWidget() {
@@ -4716,7 +5261,7 @@
 
           const surface = createWidgetElement('section', 'canvas-layout-widget-surface');
           surface.style.width = '100%';
-          surface.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', t('widgets.savedAssemblies')));
+          surface.appendChild(createWidgetElement('div', 'canvas-layout-widget-title', t('widgets.library')));
           surface.appendChild(createWidgetElement('div', 'canvas-layout-widget-note', state && state.note ? state.note : t('catalog.note')));
 
           const actions = createWidgetElement('div', 'canvas-layout-widget-actions');
@@ -4878,6 +5423,7 @@
         onImportProject: function() {
           elements.importInput.click();
         },
+        topRightCollapsed: true,
         topRegionAnchorId: 'top-region',
         edgeDrawers: [
           {
@@ -4926,23 +5472,13 @@
             renderContent: mountPanelWidget(structureWidget)
           },
           {
-            id: 'add',
-            label: t('widgets.add'),
-            renderContent: mountPanelWidget(addPartWidget)
-          },
-          {
-            id: 'part',
-            label: t('widgets.part'),
-            renderContent: mountPanelWidget(selectedPartWidget)
-          },
-          {
-            id: 'joint',
-            label: t('widgets.joint'),
-            renderContent: mountPanelWidget(selectedJointWidget)
+            id: 'properties',
+            label: t('widgets.properties'),
+            renderContent: mountPanelWidget(propertiesWidget)
           },
           {
             id: 'saved-assemblies',
-            label: t('widgets.savedAssemblies'),
+            label: t('widgets.library'),
             renderContent: mountPanelWidget(savedAssembliesWidget)
           }
         ],
@@ -4975,6 +5511,16 @@
             onClick: function() {
               redoLastAction();
             }
+          },
+          {
+            icon: '🗑',
+            label: t('actions.clearScene'),
+            getDisabled: function() {
+              return !canClearScene();
+            },
+            onClick: function() {
+              clearSceneWithConfirmation();
+            }
           }
         ],
         secondaryIconRailItems: [
@@ -5003,14 +5549,19 @@
         rightBottomWidgets: [viewCube],
         bottomTabs: [
           {
-            id: 'catalog',
-            label: t('widgets.catalog'),
-            renderContent: mountPanelWidget(assemblyCatalogWidget)
-          },
-          {
             id: 'help',
             label: t('widgets.hints'),
             renderContent: mountPanelWidget(hintWidget)
+          },
+          {
+            id: 'parts',
+            label: t('widgets.parts'),
+            renderContent: mountPanelWidget(addPartWidget)
+          },
+          {
+            id: 'catalog',
+            label: t('widgets.assemblies'),
+            renderContent: mountPanelWidget(assemblyCatalogWidget)
           }
         ],
         renderSettingsTab: createPrototypeSettingsTab
@@ -5020,7 +5571,7 @@
     function applyLocaleToUi() {
       syncStaticUiText();
       connectStrategyPanel.sync();
-      if (addPartWidget && structureWidget && selectedPartWidget && selectedJointWidget && assemblyCatalogWidget && savedAssembliesWidget) {
+      if (addPartWidget && structureWidget && propertiesWidget && assemblyCatalogWidget && savedAssembliesWidget) {
         mountCanvasLayoutPrototype();
       }
       updateConnectDebugUi();
@@ -5044,7 +5595,7 @@
     elements.connectButton.addEventListener('click', beginConnectMode);
     elements.disconnectButton.addEventListener('click', disconnectSelectedPart);
     elements.splitJointButton.addEventListener('click', splitSelectedJoint);
-    elements.deleteButton.addEventListener('click', deleteSelected);
+    elements.deleteButton.addEventListener('click', deleteCurrentSelection);
     elements.toggleAlignButton.addEventListener('click', toggleAlign);
     if (elements.topbarLanguageSelect) {
       elements.topbarLanguageSelect.addEventListener('change', handleLocaleSelectChange);
@@ -5065,8 +5616,7 @@
 
     addPartWidget = createAddPartWidget();
     structureWidget = createStructureWidget();
-    selectedPartWidget = createSelectedPartWidget();
-    selectedJointWidget = createSelectedJointWidget();
+    propertiesWidget = createPropertiesWidget();
     assemblyCatalogWidget = createAssemblyCatalogWidget();
     savedAssembliesWidget = createSavedAssembliesWidget();
     snapStatusWidget = createSnapStatusWidget();
@@ -5082,8 +5632,7 @@
     elements.modeLabel.style.display = 'none';
     syncProfileLength(profileLengthValue);
     structureWidget.update(buildStructureWidgetState());
-    selectedPartWidget.update(buildSelectedPartWidgetState());
-    selectedJointWidget.update(buildSelectedJointWidgetState());
+    refreshPropertiesWidget();
     refreshAssemblyCatalogWidget();
     modeStatusWidget.update({ text: currentModeLabelText });
     snapStatusWidget.update({ active: snapBadgeActive });
@@ -5691,7 +6240,7 @@
 
       if (event.key === 'Delete' && !event.altKey && !event.ctrlKey && !event.metaKey && !isEditableEventTarget(event.target)) {
         if (mode === 'idle' && selectedPartId && !selectedJointId && !isHistoryNavigationBlocked()) {
-          deleteSelected();
+          deleteCurrentSelection();
           event.preventDefault();
         }
         return;
@@ -5721,28 +6270,6 @@
     window.addEventListener('resize', function() {
       viewport.resize();
     });
-
-    const seedProfileA = assembly.createPart('profile-20x20', { length: 200 }, {
-      position: [-140, PROFILE_SIZE / 2, 0],
-      quaternion: [0, 0, 0, 1]
-    });
-    const seedProfileB = assembly.createPart('profile-20x20', { length: 200 }, {
-      position: [110, PROFILE_SIZE / 2, 0],
-      quaternion: [0, 0, 0, 1]
-    });
-    const seedAngle = assembly.createPart('connector-angle-20', {}, {
-      position: [20, PROFILE_SIZE / 2, 90],
-      quaternion: [0, 0, 0, 1]
-    });
-    const seedStraight = assembly.createPart('connector-straight-20', {}, {
-      position: [20, PROFILE_SIZE / 2, -90],
-      quaternion: [0, 0, 0, 1]
-    });
-
-    void seedProfileA;
-    void seedProfileB;
-    void seedAngle;
-    void seedStraight;
 
     updateConnectDebugUi();
   applyActiveTargetSelectionStrategy();

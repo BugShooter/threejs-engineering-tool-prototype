@@ -43,6 +43,13 @@
     const element = document.createElement('div');
     element.className = `callout hidden${extraClassName ? ` ${extraClassName}` : ''}`;
 
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'callout-close hidden';
+    closeButton.textContent = '×';
+    closeButton.setAttribute('aria-label', 'Close');
+    element.appendChild(closeButton);
+
     const title = document.createElement('div');
     title.className = 'callout-title';
     element.appendChild(title);
@@ -57,6 +64,7 @@
 
     return {
       element,
+      closeButton,
       title,
       lines,
       actions
@@ -199,13 +207,45 @@
       parent.appendChild(button);
     }
 
+    function attachCloseButton(target) {
+      const button = target.closeButton;
+      button.addEventListener('mouseenter', function() {
+        showTooltip(button);
+      });
+      button.addEventListener('mouseleave', function() {
+        hideTooltip();
+      });
+      button.addEventListener('click', function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        hideTooltip();
+        if (typeof button.__onClose === 'function') {
+          button.__onClose();
+        }
+      });
+    }
+
+    attachCloseButton(partCallout);
+    attachCloseButton(jointCallout);
+    attachCloseButton(helperCallout);
+
     function renderCallout(target, state) {
       if (!state) {
         target.element.classList.add('hidden');
+        target.element.classList.remove('has-close');
+        target.closeButton.classList.add('hidden');
+        target.closeButton.__onClose = null;
+        setTooltip(target.closeButton, '');
         clearNode(target.lines);
         clearNode(target.actions);
         return;
       }
+
+      const hasCloseButton = typeof state.onClose === 'function';
+      target.element.classList.toggle('has-close', hasCloseButton);
+      target.closeButton.classList.toggle('hidden', !hasCloseButton);
+      target.closeButton.__onClose = hasCloseButton ? state.onClose : null;
+      setTooltip(target.closeButton, hasCloseButton ? state.closeTooltip : '');
 
       target.title.textContent = state.title || '';
       clearNode(target.lines);
