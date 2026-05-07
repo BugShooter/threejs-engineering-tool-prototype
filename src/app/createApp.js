@@ -6271,6 +6271,232 @@
       viewport.resize();
     });
 
+    function clonePlainData(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    const screenshotSceneSnapshot = Object.freeze({
+      parts: [
+        {
+          id: 'part-1',
+          typeId: 'profile-20x20',
+          params: { length: 200 },
+          transform: {
+            position: [-246, PROFILE_SIZE / 2, 0],
+            quaternion: [0, 0, 0, 1]
+          },
+          meta: {}
+        },
+        {
+          id: 'part-2',
+          typeId: 'connector-straight-20',
+          params: {},
+          transform: {
+            position: [-133, PROFILE_SIZE / 2, 0],
+            quaternion: [0, 0, 0, 1]
+          },
+          meta: {}
+        },
+        {
+          id: 'part-3',
+          typeId: 'profile-20x20',
+          params: { length: 240 },
+          transform: {
+            position: [0, PROFILE_SIZE / 2, 0],
+            quaternion: [0, 0, 0, 1]
+          },
+          meta: {}
+        },
+        {
+          id: 'part-4',
+          typeId: 'connector-angle-20',
+          params: {},
+          transform: {
+            position: [133, PROFILE_SIZE / 2, 0],
+            quaternion: [0, 1, 0, 0]
+          },
+          meta: {}
+        },
+        {
+          id: 'part-5',
+          typeId: 'profile-20x20',
+          params: { length: 200 },
+          transform: {
+            position: [133, PROFILE_SIZE / 2, -113],
+            quaternion: [0, 0.7071067811865475, 0, 0.7071067811865476]
+          },
+          meta: {}
+        }
+      ],
+      joints: [
+        {
+          id: 'joint-1',
+          a: { partId: 'part-1', portId: 'endB' },
+          b: { partId: 'part-2', portId: 'socketA' },
+          ruleId: 'profile-end-to-connector-socket-20',
+          state: 'locked',
+          meta: {}
+        },
+        {
+          id: 'joint-2',
+          a: { partId: 'part-2', portId: 'socketB' },
+          b: { partId: 'part-3', portId: 'endA' },
+          ruleId: 'profile-end-to-connector-socket-20',
+          state: 'locked',
+          meta: {}
+        },
+        {
+          id: 'joint-3',
+          a: { partId: 'part-3', portId: 'endB' },
+          b: { partId: 'part-4', portId: 'socketX' },
+          ruleId: 'profile-end-to-connector-socket-20',
+          state: 'locked',
+          meta: {}
+        },
+        {
+          id: 'joint-4',
+          a: { partId: 'part-4', portId: 'socketZ' },
+          b: { partId: 'part-5', portId: 'endB' },
+          ruleId: 'profile-end-to-connector-socket-20',
+          state: 'locked',
+          meta: {}
+        }
+      ],
+      editor: {}
+    });
+
+    const screenshotPresetConfigs = Object.freeze({
+      overview: Object.freeze({
+        locale: 'en',
+        camera: Object.freeze({ theta: 0.78, phi: 0.98, radius: 560, tx: -36, ty: 66, tz: -36 }),
+        leftTabId: 'structure',
+        topRightTabId: 'project',
+        bottomTabId: 'help',
+        fileName: 'threejs-tool-overview.png',
+        note: 'Overview with structure tree, project panel, and the assembled workspace.'
+      }),
+      'selected-part': Object.freeze({
+        locale: 'en',
+        camera: Object.freeze({ theta: 0.72, phi: 0.94, radius: 430, tx: 12, ty: 54, tz: -22 }),
+        selectedPartId: 'part-3',
+        openProperties: true,
+        fileName: 'threejs-tool-selected-part.png',
+        note: 'Part callout plus unified Properties tab for the main profile.'
+      }),
+      settings: Object.freeze({
+        locale: 'en',
+        camera: Object.freeze({ theta: 0.78, phi: 0.98, radius: 590, tx: -36, ty: 66, tz: -36 }),
+        topRightTabId: 'settings',
+        bottomTabId: 'help',
+        fileName: 'threejs-tool-settings-history.png',
+        note: 'Settings-focused product shot with the right panel expanded.'
+      })
+    });
+
+    function syncScreenshotSurfaceState() {
+      refreshSceneOverlays();
+      refreshGizmo();
+      refreshCallouts();
+      refreshLayoutControls();
+      overlay.update();
+      viewCube.update(viewport.camera);
+    }
+
+    function resetScreenshotLayout() {
+      mountCanvasLayoutPrototype();
+      refreshLayoutControls();
+    }
+
+    function applyScreenshotPreset(name, options) {
+      const config = screenshotPresetConfigs[name];
+      if (!config) {
+        return null;
+      }
+
+      const runtimeOptions = Object.assign({ resetLayout: true }, options || {});
+      if (i18n && typeof i18n.setLocale === 'function') {
+        i18n.setLocale(config.locale || 'en', { force: true });
+      }
+
+      applyEditorSnapshot(clonePlainData(screenshotSceneSnapshot));
+      setModeLabel('—');
+
+      if (runtimeOptions.resetLayout !== false) {
+        resetScreenshotLayout();
+      }
+
+      if (config.camera) {
+        viewport.setCameraState(clonePlainData(config.camera));
+      }
+      if (config.topRightTabId) {
+        activatePanelTab('top-right-control-tabs', config.topRightTabId);
+      }
+      if (config.leftTabId) {
+        activatePanelTab('left-sandbox-tabs', config.leftTabId);
+      }
+      if (config.bottomTabId) {
+        activatePanelTab('bottom-sandbox-tabs', config.bottomTabId);
+      }
+
+      if (config.selectedPartId) {
+        if (config.openProperties) {
+          openSelectedPartProperties(config.selectedPartId, { focusLength: false });
+        } else {
+          selectPart(config.selectedPartId);
+        }
+      } else {
+        deselectAll();
+      }
+
+      syncScreenshotSurfaceState();
+      return {
+        preset: name,
+        fileName: config.fileName,
+        note: config.note,
+        viewport: {
+          width: elements.wrap.clientWidth,
+          height: elements.wrap.clientHeight
+        }
+      };
+    }
+
+    const screenshotTools = {
+      listPresets: function() {
+        return Object.keys(screenshotPresetConfigs);
+      },
+      describePresets: function() {
+        return Object.keys(screenshotPresetConfigs).map(function(name) {
+          return {
+            id: name,
+            fileName: screenshotPresetConfigs[name].fileName,
+            note: screenshotPresetConfigs[name].note
+          };
+        });
+      },
+      applyPreset: applyScreenshotPreset,
+      resetLayout: resetScreenshotLayout,
+      loadScene: function(snapshot, options) {
+        applyEditorSnapshot(clonePlainData(snapshot));
+        if (!options || options.resetLayout !== false) {
+          resetScreenshotLayout();
+        }
+        syncScreenshotSurfaceState();
+      },
+      getBaseSnapshot: function() {
+        return clonePlainData(screenshotSceneSnapshot);
+      },
+      setLocale: function(locale) {
+        if (i18n && typeof i18n.setLocale === 'function') {
+          i18n.setLocale(locale, { force: true });
+        }
+        syncScreenshotSurfaceState();
+      },
+      setCameraState: function(state) {
+        viewport.setCameraState(clonePlainData(state));
+        syncScreenshotSurfaceState();
+      }
+    };
+
     updateConnectDebugUi();
   applyActiveTargetSelectionStrategy();
     viewport.resize();
@@ -6285,7 +6511,8 @@
       assembly,
       catalog,
       viewport,
-      canvasLayoutPrototype
+      canvasLayoutPrototype,
+      screenshotTools
     };
   }
 
